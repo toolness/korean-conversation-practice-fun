@@ -71,15 +71,16 @@ class ConversationManager:
         log.info("Started session %s", sid)
         return sid
 
-    async def send(self, session_id: str, text: str) -> list[AgentEvent]:
-        """Send learner text and return collected agent events."""
+    async def stream(self, session_id: str, text: str):
+        """Send learner text and yield agent events as they arrive."""
+        from typing import AsyncGenerator
         client = self._clients.get(session_id)
         if client is None:
             log.warning("No client for session %s", session_id)
-            return [AgentEvent(type="done")]
+            yield AgentEvent(type="done")
+            return
 
         log.info("Sending to session %s: %s", session_id, text[:50])
-        events: list[AgentEvent] = []
 
         await client.query(text)
 
@@ -92,18 +93,17 @@ class ConversationManager:
                             if block.name == "mcp__practice__speak":
                                 t = block.input.get("text", "")
                                 if t:
-                                    events.append(AgentEvent(type="speak", text=t))
+                                    yield AgentEvent(type="speak", text=t)
                             elif block.name == "mcp__practice__correct":
                                 h = block.input.get("hint", "")
                                 if h:
-                                    events.append(AgentEvent(type="correct", hint=h))
+                                    yield AgentEvent(type="correct", hint=h)
                 elif isinstance(message, ResultMessage):
                     log.info("Session %s turn done (turns=%d)", session_id, message.num_turns)
         except Exception as e:
             log.error("Error in session %s: %s", session_id, e)
 
-        events.append(AgentEvent(type="done"))
-        return events
+        yield AgentEvent(type="done")
 
     async def cleanup(self, session_id: str):
         """Disconnect a session."""

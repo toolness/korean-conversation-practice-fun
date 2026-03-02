@@ -73,14 +73,28 @@ async function startScenario(id) {
   return res.json();
 }
 
-async function sendChat(text, sessionId, signal) {
+async function sendChat(text, sessionId, signal, onEvent) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, session_id: sessionId }),
     signal,
   });
-  return res.json();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop();
+    for (const part of parts) {
+      if (part.startsWith('data: ')) {
+        onEvent(JSON.parse(part.slice(6)));
+      }
+    }
+  }
 }
 
 async function transcribeAudio(blob, prompt) {
@@ -366,9 +380,7 @@ function Conversation({ briefing, onEnd }) {
     setMessages(prev => [...prev, { role: 'learner', text: userText, hints: [] }]);
 
     try {
-      const data = await sendChat(userText, sessionId, controller.signal);
-
-      for (const event of data.events) {
+      await sendChat(userText, sessionId, controller.signal, (event) => {
         if (event.type === 'session_id') {
           setSessionId(event.session_id);
         } else if (event.type === 'speak') {
@@ -377,7 +389,7 @@ function Conversation({ briefing, onEnd }) {
         } else if (event.type === 'correct') {
           addHintToLastLearner(event.hint);
         }
-      }
+      });
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Chat error:', err);

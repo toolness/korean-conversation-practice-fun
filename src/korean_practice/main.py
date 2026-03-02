@@ -1,9 +1,11 @@
 import asyncio
+import json
 import logging
 from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from korean_practice.agent import conversation_manager
@@ -50,24 +52,24 @@ async def chat(request: Request):
     # If no session exists, start a new one with the most recently started scenario
     if not session_id:
         if not _active_scenarios:
-            return {"events": [{"type": "done"}]}
+            async def empty():
+                yield 'data: {"type": "done"}\n\n'
+            return StreamingResponse(empty(), media_type="text/event-stream")
         scenario_id = list(_active_scenarios.keys())[-1]
         scenario = _active_scenarios[scenario_id]
         session_id = await conversation_manager.start(scenario)
 
-    events = await conversation_manager.send(session_id, text)
+    async def generate():
+        yield f"data: {json.dumps({'type': 'session_id', 'session_id': session_id})}\n\n"
+        async for event in conversation_manager.stream(session_id, text):
+            if event.type == "speak":
+                yield f"data: {json.dumps({'type': 'speak', 'text': event.text})}\n\n"
+            elif event.type == "correct":
+                yield f"data: {json.dumps({'type': 'correct', 'hint': event.hint})}\n\n"
+            elif event.type == "done":
+                yield f'data: {{"type": "done"}}\n\n'
 
-    result = []
-    if session_id:
-        result.append({"type": "session_id", "session_id": session_id})
-    for event in events:
-        if event.type == "speak":
-            result.append({"type": "speak", "text": event.text})
-        elif event.type == "correct":
-            result.append({"type": "correct", "hint": event.hint})
-    result.append({"type": "done"})
-
-    return {"events": result}
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @app.post("/api/transcribe")
