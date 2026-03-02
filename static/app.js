@@ -204,20 +204,22 @@ function Briefing({ briefing, onStart, onBack }) {
 
 // ─── Conversation Screen ──────────────────────────────────────────────
 function Conversation({ briefing, onEnd }) {
+  // Messages: { role, text, hints? }
+  // Hints are attached to the learner message they pertain to
   const [messages, setMessages] = useState([]);
-  const [corrections, setCorrections] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  // pttState: 'idle' | 'recording' | 'processing'
   const [pttState, setPttState] = useState('idle');
-  const chatRef = useRef(null);
-  const recRef = useRef(null); // { stream, audioCtx, source, processor, chunks }
+  const chatEndRef = useRef(null);
+  const recRef = useRef(null);
 
-  // Auto-scroll chat
+  // Smooth scroll to bottom when messages change
   useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, corrections]);
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, sending]);
 
   // Keyboard listener for hold-to-talk (non-dev mode only)
   useEffect(() => {
@@ -296,7 +298,6 @@ function Conversation({ briefing, onEnd }) {
     rec.stream.getTracks().forEach(t => t.stop());
     recRef.current = null;
 
-    // Merge chunks
     const totalLen = rec.chunks.reduce((sum, c) => sum + c.length, 0);
     const merged = new Float32Array(totalLen);
     let offset = 0;
@@ -305,7 +306,6 @@ function Conversation({ briefing, onEnd }) {
       offset += chunk.length;
     }
 
-    // Skip if too short (< 0.3s)
     if (totalLen < sampleRate * 0.3) {
       setPttState('idle');
       return;
@@ -314,7 +314,6 @@ function Conversation({ briefing, onEnd }) {
     setPttState('processing');
 
     try {
-      // Downsample to 16kHz for whisper
       const targetRate = 16000;
       const downsampled = downsample(merged, sampleRate, targetRate);
       const wavBlob = encodeWAV(downsampled, targetRate);
@@ -331,14 +330,26 @@ function Conversation({ briefing, onEnd }) {
     }
   }
 
+  function addHintToLastLearner(hint) {
+    setMessages(prev => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        if (copy[i].role === 'learner') {
+          copy[i] = { ...copy[i], hints: [...(copy[i].hints || []), hint] };
+          break;
+        }
+      }
+      return copy;
+    });
+  }
+
   async function handleSend(text) {
     if (!text.trim() || sending) return;
     const userText = text.trim();
     setInput('');
     setSending(true);
-    setCorrections([]);
 
-    setMessages(prev => [...prev, { role: 'learner', text: userText }]);
+    setMessages(prev => [...prev, { role: 'learner', text: userText, hints: [] }]);
 
     try {
       const data = await sendChat(userText, sessionId);
@@ -350,7 +361,7 @@ function Conversation({ briefing, onEnd }) {
           setMessages(prev => [...prev, { role: 'partner', text: event.text }]);
           speak(event.text);
         } else if (event.type === 'correct') {
-          setCorrections(prev => [...prev, event.hint]);
+          addHintToLastLearner(event.hint);
         }
       }
     } catch (err) {
@@ -375,76 +386,88 @@ function Conversation({ briefing, onEnd }) {
     : 'ptt-idle';
 
   return html`
-    <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-        <h2 style="margin: 0; border: none; padding: 0; font-size: 1.1rem;">${briefing.title}</h2>
-        <button class="btn btn-outline" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onClick=${onEnd}>End</button>
+    <div class="conv-layout">
+      <div class="conv-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0; border: none; padding: 0; font-size: 1.1rem;">${briefing.title}</h2>
+          <button class="btn btn-outline" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onClick=${onEnd}>End</button>
+        </div>
+        <div class="context-bar">
+          <strong>${briefing.context.role}</strong> — ${briefing.context.detail}${briefing.context.friend_status ? html` · <em>${briefing.context.friend_status}</em>` : ''}
+        </div>
       </div>
 
-      <div class="context-bar">
-        <strong>${briefing.context.role}</strong> — ${briefing.context.detail}${briefing.context.friend_status ? html` · <em>${briefing.context.friend_status}</em>` : ''}
-      </div>
-
-      <div class="chat-area" ref=${chatRef}>
+      <div class="conv-messages">
         ${messages.length === 0 && html`
           <p style="color: var(--muted); font-size: 0.85rem; text-align: center; padding: 2rem 0;">
             Start speaking! Say "여보세요" to begin the phone call.
           </p>
         `}
         ${messages.map((m, i) => html`
-          <div class="chat-bubble ${m.role}" key=${i}>
-            <div class="speaker">${m.role === 'partner' ? 'Partner' : 'You'}</div>
-            ${m.text}
-            ${m.role === 'partner' && html`
-              <button class="replay-btn" onClick=${() => replay(m.text)} title="Replay">${"\u25B6"}</button>
+          <div key=${i}>
+            <div class="chat-bubble ${m.role}">
+              <div class="speaker">${m.role === 'partner' ? 'Partner' : 'You'}</div>
+              ${m.text}
+              ${m.role === 'partner' && html`
+                <button class="replay-btn" onClick=${() => replay(m.text)} title="Replay">${"\u25B6"}</button>
+              `}
+            </div>
+            ${m.hints && m.hints.length > 0 && html`
+              <div class="correction-panel">
+                <div class="correction-title">Hint</div>
+                ${m.hints.map((h, j) => html`<p key=${j}>${h}</p>`)}
+              </div>
             `}
           </div>
         `)}
         ${sending && html`
           <div style="color: var(--muted); font-size: 0.8rem; padding: 0.25rem 0.5rem;">Thinking...</div>
         `}
+        <div ref=${chatEndRef}></div>
       </div>
 
-      ${corrections.length > 0 && html`
-        <div class="correction-panel">
-          <div class="correction-title">Hint</div>
-          ${corrections.map((c, i) => html`<p key=${i}>${c}</p>`)}
-        </div>
-      `}
+      <div class="conv-footer">
+        ${DEV_MODE ? html`
+          <div class="dev-input">
+            <input
+              type="text"
+              value=${input}
+              onInput=${e => setInput(e.target.value)}
+              onKeyDown=${handleKeyDown}
+              placeholder="Type Korean here (dev mode)..."
+              disabled=${sending}
+              style="flex: 1;"
+            />
+            <button
+              class="btn btn-primary"
+              onClick=${() => handleSend(input)}
+              disabled=${sending || !input.trim()}
+            >Send</button>
+          </div>
+        ` : html`
+          <div class="ptt-bar">
+            <span class="ptt-state ${pttClass}">${pttLabel}</span>
+            ${pttState === 'recording' && html`
+              <span style="font-size: 0.75rem; color: var(--muted); margin-left: 0.5rem;">Esc to cancel</span>
+            `}
+          </div>
+        `}
 
-      ${DEV_MODE ? html`
-        <div class="dev-input">
-          <input
-            type="text"
-            value=${input}
-            onInput=${e => setInput(e.target.value)}
-            onKeyDown=${handleKeyDown}
-            placeholder="Type Korean here (dev mode)..."
-            disabled=${sending}
-            style="flex: 1;"
-          />
-          <button
-            class="btn btn-primary"
-            onClick=${() => handleSend(input)}
-            disabled=${sending || !input.trim()}
-          >Send</button>
+        ${DEV_MODE && html`
+          <div class="tts-log-container">
+            <div class="wireframe-label">TTS Log (dev mode)</div>
+            <div id="tts-log"></div>
+          </div>
+        `}
+        <div style="margin-top: 0.5rem;">
+          <button class="btn btn-outline" style="font-size: 0.6rem; padding: 0.15rem 0.5rem;"
+            onClick=${() => {
+              console.log('TTS test. Voice:', _koreanVoice?.name || 'none found', 'Voices:', speechSynthesis.getVoices().filter(v => v.lang.startsWith('ko')).map(v => v.name));
+              replay('안녕하세요. 테스트입니다.');
+            }}>Test TTS</button>
+          <span style="font-size: 0.6rem; color: var(--muted); margin-left: 0.5rem;">Voice: ${_koreanVoice ? _koreanVoice.name : 'none found'}</span>
         </div>
-      ` : html`
-        <div class="ptt-bar">
-          <div class="wireframe-label">Voice Input</div>
-          <span class="ptt-state ${pttClass}">${pttLabel}</span>
-          ${pttState === 'recording' && html`
-            <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem;">Press Escape to cancel</div>
-          `}
-        </div>
-      `}
-
-      ${DEV_MODE && html`
-        <div class="tts-log-container">
-          <div class="wireframe-label">TTS Log (dev mode)</div>
-          <div id="tts-log"></div>
-        </div>
-      `}
+      </div>
     </div>
   `;
 }
@@ -532,17 +555,7 @@ function App() {
       break;
   }
 
-  return html`
-    ${content}
-    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px dashed var(--border);">
-      <button class="btn btn-outline" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;"
-        onClick=${() => {
-          console.log('TTS test. Voice:', _koreanVoice?.name || 'none found', 'Voices available:', speechSynthesis.getVoices().filter(v => v.lang.startsWith('ko')).map(v => v.name));
-          replay('안녕하세요. 테스트입니다.');
-        }}>Test TTS</button>
-      <span style="font-size: 0.7rem; color: var(--muted); margin-left: 0.5rem;">Voice: ${_koreanVoice ? _koreanVoice.name : 'none found'}</span>
-    </div>
-  `;
+  return content;
 }
 
 render(html`<${App} />`, document.getElementById('app'));
