@@ -6,7 +6,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-MODEL_PATH = Path.home() / "Documents/explorations/audio-assistant-fun/models/ggml-large-v3-turbo.bin"
+import os
+
+MODEL_PATH = Path(os.environ.get(
+    "WHISPER_MODEL",
+    Path.home() / "Documents/explorations/audio-assistant-fun/models/ggml-large-v3-turbo.bin",
+))
 
 
 DEFAULT_PROMPT = "여보세요, 거기 집이지요? 네, 그런데요. 실례지만 누구세요?"
