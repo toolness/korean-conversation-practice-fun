@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Korean Conversation Practice — Project Brief</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #d4d4d4;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --orange: #ea580c;
+    --orange-light: #fff7ed;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+    --gray-light: #f5f5f4;
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.35rem; margin-top: 2.5rem; margin-bottom: 1rem; border-bottom: 2px solid var(--text); padding-bottom: 0.25rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  h4 { font-size: 0.95rem; margin-top: 1rem; margin-bottom: 0.4rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  p, li { margin-bottom: 0.5rem; }
+  ul { padding-left: 1.5rem; }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+
+  /* ---- Wireframe styles ---- */
+  .wireframe {
+    border: 2px solid var(--text);
+    border-radius: var(--radius);
+    margin: 1rem 0 2rem;
+    overflow: hidden;
+    background: #fff;
+  }
+  .wireframe-title {
+    background: var(--text);
+    color: #fff;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .wireframe-body {
+    padding: 1rem;
+  }
+  .wireframe-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+
+  .scenario-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .scenario-card:hover { background: var(--blue-light); }
+  .scenario-card .unit-badge {
+    display: inline-block;
+    background: var(--blue);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    margin-right: 0.5rem;
+  }
+  .scenario-card .grammar-tags {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+  }
+
+  .briefing-box {
+    background: var(--purple-light);
+    border: 1px solid var(--purple);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .briefing-box .role-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--purple);
+  }
+  .briefing-box .role-detail {
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  .vocab-pill {
+    display: inline-block;
+    background: var(--gray-light);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.8rem;
+    margin: 0.15rem 0.1rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
+
+  /* Chat area */
+  .chat-area {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    min-height: 180px;
+    background: var(--gray-light);
+    margin-bottom: 0.75rem;
+  }
+  .chat-bubble {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    max-width: 80%;
+    font-size: 0.9rem;
+  }
+  .chat-bubble.partner {
+    background: var(--blue-light);
+    border: 1px solid #bfdbfe;
+    margin-right: auto;
+  }
+  .chat-bubble.learner {
+    background: var(--green-light);
+    border: 1px solid #bbf7d0;
+    margin-left: auto;
+  }
+  .chat-bubble .speaker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 0.15rem;
+  }
+  .chat-bubble.partner .speaker { color: var(--blue); }
+  .chat-bubble.learner .speaker { color: var(--green); }
+
+  .correction-panel {
+    background: var(--orange-light);
+    border: 1px solid var(--orange);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+  }
+  .correction-panel .correction-title {
+    font-weight: 700;
+    color: var(--orange);
+    margin-bottom: 0.25rem;
+  }
+
+  .ptt-bar {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    text-align: center;
+    background: #fff;
+  }
+  .ptt-state {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.25rem;
+  }
+  .ptt-idle { background: var(--gray-light); color: var(--text); border: 1px solid var(--border); }
+  .ptt-recording { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+  .ptt-processing { background: #fefce8; color: #a16207; border: 1px solid #fde68a; }
+
+  .hint-bar {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-style: italic;
+    padding: 0.4rem 0;
+    border-top: 1px dashed var(--border);
+    margin-top: 0.5rem;
+  }
+
+  /* Template cards */
+  .template-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    background: #fff;
+  }
+  .template-card-header {
+    background: var(--gray-light);
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+  }
+  .template-card-body {
+    padding: 1rem;
+  }
+  .template-card-body .section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-top: 0.75rem;
+    margin-bottom: 0.3rem;
+  }
+  .template-card-body .section-label:first-child { margin-top: 0; }
+
+  .flow-step {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    padding: 0.2rem 0;
+  }
+  .flow-role {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    min-width: 4.5rem;
+    text-align: right;
+  }
+  .flow-role.partner { color: var(--blue); }
+  .flow-role.learner { color: var(--green); }
+
+  .instantiation {
+    background: var(--green-light);
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+  .instantiation .inst-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 0.3rem;
+  }
+
+  /* Code blocks */
+  pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1rem;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    margin: 0.5rem 0 1rem;
+  }
+  code {
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  }
+  p code, li code {
+    background: var(--gray-light);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+
+  /* Comparison table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.5rem 0 1rem;
+    font-size: 0.85rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+  th {
+    background: var(--gray-light);
+    font-weight: 700;
+  }
+  td:first-child { font-weight: 600; }
+
+  .rec-box {
+    background: var(--green-light);
+    border: 1px solid var(--green);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+  .rec-box strong { color: var(--green); }
+
+  .columns { display: flex; gap: 1rem; }
+  .columns > div { flex: 1; }
+  @media (max-width: 700px) { .columns { flex-direction: column; } }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    margin: 1rem 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .arch-row { width: 100%; max-width: 520px; }
+  .arch-arrow {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--muted);
+    padding: 0.3rem 0;
+    font-weight: 600;
+  }
+  .arch-box {
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .arch-box-title {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .arch-box-items {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.8rem;
+  }
+  .arch-browser { border-color: var(--blue); }
+  .arch-browser .arch-box-title { background: var(--blue-light); color: var(--blue); }
+  .arch-server { border-color: var(--green); }
+  .arch-server .arch-box-title { background: var(--green-light); color: var(--green); }
+  .arch-agent { border-color: var(--purple); }
+  .arch-agent .arch-box-title { background: var(--purple-light); color: var(--purple); }
+</style>
+</head>
+<body>
+
+<h1>Korean Conversation Practice</h1>
+<p class="subtitle">Project brief &amp; wireframes — personal learning tool built around <em>Active Korean</em> workbooks</p>
+
+<!-- ============================================================ -->
+<h2>1. Project Brief</h2>
+
+<h3>What it does</h3>
+<p>A local web app that lets me practice Korean conversational patterns from Seoul National University's <em>Active Korean</em> series. I pick a scenario (e.g. "introduce yourself", "order at a restaurant"), get assigned a randomized role, and have a spoken conversation with an AI partner.</p>
+
+<h3>Architecture</h3>
+<p>A single Python process serves both the frontend and API. Launch with one command (<code>uv run start</code>), opens a browser tab to <code>localhost</code>.</p>
+
+<div class="arch-diagram">
+  <div class="arch-row">
+    <div class="arch-box arch-browser">
+      <div class="arch-box-title">Browser (Frontend)</div>
+      <div class="arch-box-items">
+        <span>HTML / CSS / vanilla JS</span>
+        <span>MediaRecorder API — audio capture</span>
+        <span>SpeechSynthesis API — TTS via Yuna (Premium)</span>
+        <span>Hold-to-talk keyboard events</span>
+      </div>
+    </div>
+  </div>
+  <div class="arch-arrow">HTTP &amp; SSE &darr;&uarr;</div>
+  <div class="arch-row">
+    <div class="arch-box arch-server">
+      <div class="arch-box-title">Python Backend (FastAPI)</div>
+      <div class="arch-box-items">
+        <span>Serves static HTML/JS</span>
+        <span>POST /api/transcribe — receives audio, runs whisper-cli</span>
+        <span>POST /api/chat — sends learner text to agent, streams response</span>
+        <span>GET /api/scenarios — lists available scenarios</span>
+      </div>
+    </div>
+  </div>
+  <div class="arch-arrow">&darr;&uarr;</div>
+  <div class="arch-row">
+    <div class="arch-box arch-agent">
+      <div class="arch-box-title">Claude Agent SDK</div>
+      <div class="arch-box-items">
+        <span>Multi-turn conversation via ClaudeSDKClient</span>
+        <span>Custom tools: speak(text), correct(hint)</span>
+        <span>Routed through Claude Max subscription</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>Key components</h3>
+<ul>
+  <li><strong>Frontend</strong> — plain HTML/CSS/JS served by the backend. No build step, no framework.</li>
+  <li><strong>FastAPI backend</strong> — async Python web framework. Serves the page and handles API endpoints. Async-native, which matches the Claude Agent SDK's async API.</li>
+  <li><strong>Claude Agent SDK</strong> (<code>claude-agent-sdk</code>) — drives the conversation via multi-turn sessions, routed through Claude Max subscription (no metered API costs)</li>
+  <li><strong>TTS</strong> — browser's <code>SpeechSynthesis</code> API using the <code>Yuna (Premium)</code> Korean voice. Runs entirely client-side, no backend call needed.</li>
+  <li><strong>STT</strong> — browser records audio via <code>MediaRecorder</code>, sends the blob to the backend, which runs <code>whisper-cli</code> (whisper.cpp) and returns Hangul text</li>
+  <li><strong>uv</strong> for virtualenv/dependency management, <code>pyproject.toml</code> for portability</li>
+</ul>
+
+<h3>Why a web app instead of pygame?</h3>
+<ul>
+  <li><strong>Self-verification</strong> — Chrome DevTools MCP lets the development agent (Claude Code) take snapshots, click elements, check console errors, and verify the app end-to-end without manual testing</li>
+  <li><strong>TTS is free</strong> — browser's SpeechSynthesis API with Yuna Premium, no subprocess call needed</li>
+  <li><strong>Audio recording</strong> — MediaRecorder API handles it natively</li>
+  <li><strong>Still feels like one app</strong> — single <code>uv run start</code> command, localhost only, no deployment concerns</li>
+</ul>
+
+<h3>Voice input: quasimodal hold-to-talk</h3>
+<ul>
+  <li>Hold a key (e.g. Space) to record — browser captures audio via MediaRecorder</li>
+  <li>Press ESC while holding to cancel and start over</li>
+  <li>Release the key — audio blob is sent to <code>POST /api/transcribe</code></li>
+  <li>Backend runs <code>whisper-cli</code>, returns Hangul text, which is sent to the conversation agent</li>
+</ul>
+
+<h3>Teaching approach</h3>
+<p>The agent uses <strong>Socratic correction</strong>: if I make a mistake, it never gives me the answer directly. Instead it gives hints — pointing out which particle is wrong, reminding me of a grammar rule, or asking me to try again. The agent has two output channels (implemented as custom tools):</p>
+<ul>
+  <li><strong><code>speak(text)</code></strong> — text to say aloud as the conversation partner. Frontend receives this via SSE and passes it to SpeechSynthesis.</li>
+  <li><strong><code>correct(hint)</code></strong> — written feedback/hints shown on screen when I make a mistake</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>2. UI Wireframes</h2>
+
+<!-- ---- Screen A: Scenario Select ---- -->
+<h3>A. Scenario Select</h3>
+
+<div class="wireframe">
+  <div class="wireframe-title">Scenario Select</div>
+  <div class="wireframe-body">
+
+    <div class="wireframe-label">Unit 2 — Greetings &amp; Introductions</div>
+    <div class="scenario-card">
+      <span class="unit-badge">U2</span> Self-Introduction at a Party
+      <div class="grammar-tags">Grammar: topic particles, 이다 copula</div>
+    </div>
+    <div class="scenario-card">
+      <span class="unit-badge">U2</span> Meeting a New Colleague
+      <div class="grammar-tags">Grammar: topic particles, 이다 copula, 네/아니요</div>
+    </div>
+
+    <div class="wireframe-label" style="margin-top: 1rem;">Unit 3 — Restaurant</div>
+    <div class="scenario-card">
+      <span class="unit-badge">U3</span> Ordering Food &amp; Drinks
+      <div class="grammar-tags">Grammar: -(으)세요, Korean numbers, 하고, counting units</div>
+    </div>
+
+    <div class="wireframe-label" style="margin-top: 1rem;">Unit 9 — Phone Call</div>
+    <div class="scenario-card">
+      <span class="unit-badge">U9</span> Calling Someone's House
+      <div class="grammar-tags">Grammar: -지요, -아/어 주세요, -고 있다</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ---- Screen B: Briefing ---- -->
+<h3>B. Pre-Conversation Briefing</h3>
+
+<div class="wireframe">
+  <div class="wireframe-title">Briefing — Self-Introduction at a Party</div>
+  <div class="wireframe-body">
+
+    <div class="briefing-box">
+      <div class="wireframe-label">Your role</div>
+      <div class="role-name">You are 재민</div>
+      <div class="role-detail">From <strong>독일</strong> (Germany) &middot; Occupation: <strong>연구원</strong> (researcher)</div>
+    </div>
+
+    <div class="wireframe-label">Grammar points</div>
+    <p style="font-size: 0.9rem;">Topic particles (은/는) &middot; 이다 copula &middot; 네/아니요</p>
+
+    <div class="wireframe-label" style="margin-top: 0.75rem;">Key vocabulary</div>
+    <div>
+      <span class="vocab-pill">이름 — name</span>
+      <span class="vocab-pill">국적 — nationality</span>
+      <span class="vocab-pill">직업 — occupation</span>
+      <span class="vocab-pill">사람 — person</span>
+      <span class="vocab-pill">저 — I</span>
+      <span class="vocab-pill">씨 — Mr./Ms.</span>
+    </div>
+
+    <div style="margin-top: 1.25rem; text-align: center;">
+      <span class="btn btn-primary">Start Conversation</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ---- Screen C: Conversation ---- -->
+<h3>C. Conversation (Main Screen)</h3>
+
+<div class="wireframe">
+  <div class="wireframe-title">Conversation — Self-Introduction at a Party</div>
+  <div class="wireframe-body">
+
+    <div class="chat-area">
+      <div class="chat-bubble partner">
+        <div class="speaker">Partner</div>
+        안녕하세요! 이름이 뭐예요?
+      </div>
+      <div class="chat-bubble learner">
+        <div class="speaker">You</div>
+        저는 재민이에요.
+      </div>
+      <div class="chat-bubble partner">
+        <div class="speaker">Partner</div>
+        재민 씨, 어느 나라 사람이에요?
+      </div>
+      <div class="chat-bubble learner">
+        <div class="speaker">You</div>
+        저는 독일에서 왔어요.
+      </div>
+    </div>
+
+    <div class="correction-panel">
+      <div class="correction-title">Hint</div>
+      That's understandable, but at this level we haven't learned -에서 왔어요 yet. Try using the topic particle with 사람. Think: "[country] 사람이에요."
+    </div>
+
+    <div class="ptt-bar">
+      <div class="wireframe-label">Voice Input</div>
+      <span class="ptt-state ptt-idle">Hold Space to speak</span>
+      <span class="ptt-state ptt-recording">Recording... (ESC to cancel)</span>
+      <span class="ptt-state ptt-processing">Converting speech...</span>
+    </div>
+
+    <div class="hint-bar">
+      Your partner asked where you're from — answer with your nationality.
+    </div>
+
+  </div>
+</div>
+
+<p style="font-size: 0.85rem; color: var(--muted);">All three push-to-talk states shown for illustration. Only one would be visible at a time.</p>
+
+
+<!-- ============================================================ -->
+<h2>3. Sample Conversation Templates</h2>
+
+<p>Each template defines a scenario, its dynamic context (randomized from vocabulary pools), and the expected conversation flow. Below, each template is shown alongside one possible random instantiation.</p>
+
+<!-- ---- Template 1 ---- -->
+<div class="template-card">
+  <div class="template-card-header">Unit 2 — Self-Introduction</div>
+  <div class="template-card-body">
+
+    <div class="section-label">Scenario</div>
+    <p>Meeting someone at a party. Your partner greets you and asks about your name, nationality, and occupation.</p>
+
+    <div class="section-label">Dynamic context (randomized)</div>
+    <ul style="font-size: 0.85rem;">
+      <li><strong>name</strong> — random Korean name</li>
+      <li><strong>country</strong> — random from Unit 2 countries (미국, 중국, 일본, 인도, 호주, 영국, 독일, 프랑스, 캐나다, 한국, 러시아)</li>
+      <li><strong>occupation</strong> — random from Unit 2 occupations (선생님, 학생, 의사, 요리사, 은행원, 기자, 회사원, 연구원)</li>
+    </ul>
+
+    <div class="section-label">Conversation flow</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Greet and ask name</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> Introduce name using topic particle + 이다</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Ask nationality</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> State nationality using [country] 사람이에요</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Ask occupation</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> State occupation using [occupation]이에요/예요</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Closing pleasantry</div>
+
+    <div class="instantiation">
+      <div class="inst-label">Example instantiation</div>
+      <p><strong>Context:</strong> You are <strong>소피아</strong>, from <strong>프랑스</strong>, a <strong>기자</strong>.</p>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 안녕하세요! 이름이 뭐예요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 저는 소피아예요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 소피아 씨, 어느 나라 사람이에요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 프랑스 사람이에요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 직업이 뭐예요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 기자예요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 만나서 반갑습니다!</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ---- Template 2 ---- -->
+<div class="template-card">
+  <div class="template-card-header">Unit 3 — Ordering at a Restaurant</div>
+  <div class="template-card-body">
+
+    <div class="section-label">Scenario</div>
+    <p>You're at a Korean restaurant. The waiter asks what you'd like. You order food and drinks using -(으)세요 request form and counting units.</p>
+
+    <div class="section-label">Dynamic context (randomized)</div>
+    <ul style="font-size: 0.85rem;">
+      <li><strong>food</strong> — random from Unit 3 food (불고기, 냉면, 비빔밥, 라면, 김밥, etc.)</li>
+      <li><strong>food_qty</strong> — random 1–3 (using native Korean numbers + 개/인분)</li>
+      <li><strong>drink</strong> — random from Unit 3 drinks (우유, 콜라, 맥주, 물, 커피, etc.)</li>
+      <li><strong>drink_qty</strong> — random 1–3 (using native Korean numbers + 잔/병)</li>
+    </ul>
+
+    <div class="section-label">Conversation flow</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Greet, ask what you'd like to order</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> Order food using [food] 주세요</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Ask how many</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> State quantity using native number + counter</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Ask about drinks</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> Order drink with quantity</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Confirm order</div>
+
+    <div class="instantiation">
+      <div class="inst-label">Example instantiation</div>
+      <p><strong>Context:</strong> You want <strong>비빔밥</strong> (2) and <strong>맥주</strong> (1).</p>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 어서 오세요! 뭘 드릴까요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 비빔밥 주세요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 몇 개 드릴까요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 두 개 주세요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 음료는요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 맥주 한 병 주세요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 네, 비빔밥 두 개하고 맥주 한 병이요. 잠깐만 기다리세요.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ---- Template 3 ---- -->
+<div class="template-card">
+  <div class="template-card-header">Unit 9 — Phone Call</div>
+  <div class="template-card-body">
+
+    <div class="section-label">Scenario</div>
+    <p>You call someone's house. A family member answers. You confirm the house, ask to speak to your friend, and respond appropriately if they're busy.</p>
+
+    <div class="section-label">Dynamic context (randomized)</div>
+    <ul style="font-size: 0.85rem;">
+      <li><strong>caller_name</strong> — random Korean name (your name)</li>
+      <li><strong>friend_name</strong> — random Korean name (person you're calling)</li>
+      <li><strong>activity</strong> — random from: 자다 (sleeping), 샤워하다 (showering), 공부하다 (studying), 운동하다 (exercising)</li>
+      <li><strong>available</strong> — random true/false (determines if friend can come to the phone)</li>
+    </ul>
+
+    <div class="section-label">Conversation flow</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> Greet, confirm this is [friend]'s house using -지요</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> Confirm, ask who's calling</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> Introduce self, ask to speak to [friend] using -아/어 주세요</div>
+    <div class="flow-step"><span class="flow-role partner">Partner</span> <em>If available:</em> 잠깐만 기다리세요 / <em>If busy:</em> 지금 [activity]-고 있어요</div>
+    <div class="flow-step"><span class="flow-role learner">Learner</span> <em>If busy:</em> 네, 알겠습니다. 안녕히 계세요.</div>
+
+    <div class="instantiation">
+      <div class="inst-label">Example instantiation (friend is busy)</div>
+      <p><strong>Context:</strong> You are <strong>선우</strong>, calling <strong>피터</strong>'s house. 피터 is <strong>샤워하고 있어요</strong>.</p>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 여보세요. 거기 피터 씨 집이지요?</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 네, 그런데요. 실례지만 누구세요?</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 저는 선우예요. 피터 씨 좀 바꿔 주세요.</div>
+      <div class="flow-step"><span class="flow-role partner">Partner</span> 지금 샤워하고 있어요.</div>
+      <div class="flow-step"><span class="flow-role learner">Learner</span> 네, 알겠습니다. 안녕히 계세요.</div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<h2>4. Template Format: YAML vs Python</h2>
+
+<p>The templates above need to be defined somewhere in code. Two natural choices: YAML data files with a custom resolver, or Python classes. Here's the same template (Unit 2 self-introduction) in both formats, followed by a tradeoff analysis.</p>
+
+<div class="columns">
+
+<div>
+<h3>YAML</h3>
+<pre><code>scenario: self-introduction
+unit: 2
+title: Self-Introduction at a Party
+grammar:
+  - topic particles (은/는)
+  - 이다 copula
+
+context:
+  name:
+    pool: korean_names
+  country:
+    pool: unit2.countries
+  occupation:
+    pool: unit2.occupations
+
+system_prompt: |
+  You are a friendly Korean speaker at a
+  party. The learner's name is {name}.
+  They are from {country} and work as
+  a {occupation}. Ask about their name,
+  nationality, and occupation in order.
+
+  Only use grammar and vocabulary from
+  Active Korean Units 1-2. If they make
+  a mistake, use the correct tool to
+  give a Socratic hint.
+
+flow:
+  - role: partner
+    intent: greet_and_ask_name
+  - role: learner
+    intent: introduce_name
+    grammar: [topic particle, 이다]
+  - role: partner
+    intent: ask_nationality
+  - role: learner
+    intent: state_nationality
+  - role: partner
+    intent: ask_occupation
+  - role: learner
+    intent: state_occupation
+  - role: partner
+    intent: closing</code></pre>
+</div>
+
+<div>
+<h3>Python</h3>
+<pre><code>from scenarios import Scenario
+import random
+
+COUNTRIES = [
+    "미국", "중국", "일본", "인도",
+    "호주", "영국", "독일", "프랑스",
+    "캐나다", "한국", "러시아",
+]
+
+OCCUPATIONS = [
+    "선생님", "학생", "의사", "요리사",
+    "은행원", "기자", "회사원", "연구원",
+]
+
+class SelfIntroduction(Scenario):
+    unit = 2
+    title = "Self-Introduction at a Party"
+    grammar = [
+        "topic particles (은/는)",
+        "이다 copula",
+    ]
+
+    def setup(self):
+        self.name = random_korean_name()
+        self.country = random.choice(
+            COUNTRIES
+        )
+        self.occupation = random.choice(
+            OCCUPATIONS
+        )
+
+    def system_prompt(self):
+        return f"""You are a friendly
+Korean speaker at a party. The learner's
+name is {self.name}. They are from
+{self.country} and work as a
+{self.occupation}. Ask about their name,
+nationality, and occupation in order.
+
+Only use grammar and vocabulary from
+Active Korean Units 1-2. If they make
+a mistake, use the correct tool to give
+a Socratic hint."""</code></pre>
+</div>
+
+</div>
+
+<h3>Tradeoff Comparison</h3>
+
+<table>
+  <thead>
+    <tr><th>Dimension</th><th>YAML</th><th>Python</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Readability</td>
+      <td>Very readable, declarative, scannable</td>
+      <td>Readable but more verbose</td>
+    </tr>
+    <tr>
+      <td>Randomization</td>
+      <td>Needs a custom resolver engine to handle <code>{pool: ...}</code> references</td>
+      <td>Native — just call <code>random.choice()</code></td>
+    </tr>
+    <tr>
+      <td>Validation</td>
+      <td>Runtime only; typos in pool names or field names fail silently or late</td>
+      <td>IDE autocomplete, type checking, errors caught immediately</td>
+    </tr>
+    <tr>
+      <td>Flexibility</td>
+      <td>Limited to what the YAML engine supports; conditional flows (e.g. "friend available" branching in phone call) need custom syntax</td>
+      <td>Arbitrary logic — if/else, loops, conditional prompts all natural</td>
+    </tr>
+    <tr>
+      <td>System prompt</td>
+      <td>String templates with <code>{var}</code> — needs a template engine to resolve</td>
+      <td>f-strings with full Python expressions</td>
+    </tr>
+    <tr>
+      <td>Dependencies</td>
+      <td>Requires PyYAML</td>
+      <td>No extra dependency</td>
+    </tr>
+    <tr>
+      <td>Separation of concerns</td>
+      <td>Data is separate from code</td>
+      <td>Data and logic co-located in one file</td>
+    </tr>
+    <tr>
+      <td>Adding a new scenario</td>
+      <td>Copy a YAML file, edit fields</td>
+      <td>Write a new class (a few more lines, but with guidance from base class)</td>
+    </tr>
+    <tr>
+      <td>Who edits them</td>
+      <td>Anyone — no Python knowledge needed</td>
+      <td>Requires Python familiarity (but it's just you)</td>
+    </tr>
+    <tr>
+      <td>Flow definition</td>
+      <td>Clean list of steps — but <code>intent</code> strings are just labels with no enforcement</td>
+      <td>Flow can be implicit in the system prompt, or explicit as a list — either way, logic is enforceable</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="rec-box">
+  <strong>Recommendation: Python classes.</strong>
+  <p style="margin-top: 0.4rem;">For a personal project where you're the only author:</p>
+  <ol>
+    <li><strong>Randomization is first-class</strong> — no custom YAML resolver needed, just <code>random.choice()</code></li>
+    <li><strong>System prompts need nuance</strong> — they'll reference grammar rules, vocabulary constraints, correction styles. f-strings and methods handle this naturally; YAML string templates get awkward fast</li>
+    <li><strong>Conditional flows</strong> — the phone call template has branching (friend available vs. busy). In YAML you'd need to invent control-flow syntax; in Python it's just <code>if/else</code></li>
+    <li><strong>No extra dependency</strong> — no PyYAML needed</li>
+    <li><strong>IDE support</strong> — typos in vocabulary lists, missing fields on a scenario class, wrong method signatures — all caught before runtime</li>
+  </ol>
+  <p style="margin-top: 0.4rem;">The one advantage of YAML — separation of data from code — matters when non-programmers edit templates. Since this is a personal project, that advantage doesn't apply.</p>
+</div>
+
+
+</body>
+</html>
