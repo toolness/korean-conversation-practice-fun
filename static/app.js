@@ -265,6 +265,13 @@ function Conversation({ briefing, onEnd }) {
     };
   }, [pttState, sending, sessionId]);
 
+  // Auto-start: trigger agent to speak first for agent-initiated roles
+  useEffect(() => {
+    if (briefing.auto_start) {
+      handleSend('[START]');
+    }
+  }, []);
+
   function cancelSend() {
     if (abortRef.current) abortRef.current.abort();
     // Remove the last learner message
@@ -377,7 +384,10 @@ function Conversation({ briefing, onEnd }) {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setMessages(prev => [...prev, { role: 'learner', text: userText, hints: [] }]);
+    // Don't show [START] trigger as a learner message
+    if (userText !== '[START]') {
+      setMessages(prev => [...prev, { role: 'learner', text: userText, hints: [] }]);
+    }
 
     try {
       await sendChat(userText, sessionId, controller.signal, (event) => {
@@ -426,9 +436,9 @@ function Conversation({ briefing, onEnd }) {
       </div>
 
       <div class="conv-messages">
-        ${messages.length === 0 && html`
+        ${messages.length === 0 && !sending && html`
           <p style="color: var(--muted); font-size: 0.85rem; text-align: center; padding: 2rem 0;">
-            Start speaking! Say "여보세요" to begin the phone call.
+            ${briefing.start_hint || 'Start the conversation!'}
           </p>
         `}
         ${messages.map((m, i) => html`

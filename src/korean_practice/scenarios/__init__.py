@@ -39,7 +39,17 @@ class Scenario:
     title: str
     grammar: list[str]
     example_conversations: list[list[tuple[str, str]]]
+    role: str = ""
     _context: dict = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def roles(cls) -> tuple[str, ...]:
+        """Named roles for this scenario. Override to enable multi-role registration."""
+        return ()
+
+    def role_display_title(self) -> str:
+        """Title for the scenario list. Override for role-specific titles."""
+        return self.title
 
     def setup(self) -> None:
         """Randomize context for this scenario. Override in subclasses."""
@@ -73,7 +83,7 @@ class Scenario:
         return {
             "id": self.id,
             "unit": self.unit,
-            "title": self.title,
+            "title": self.role_display_title(),
             "grammar": self.grammar,
             "context": self._context,
         }
@@ -96,31 +106,38 @@ class Scenario:
         return "\n".join(lines)
 
 
-# Registry of all scenarios
-_REGISTRY: dict[str, type[Scenario]] = {}
+# Registry of all scenarios: id -> (class, role)
+_REGISTRY: dict[str, tuple[type[Scenario], str]] = {}
 
 
 def register(cls: type[Scenario]) -> type[Scenario]:
-    instance = cls()
-    _REGISTRY[instance.id] = cls
+    base = cls()
+    roles = cls.roles()
+    if roles:
+        for role in roles:
+            _REGISTRY[f"{base.id}_{role}"] = (cls, role)
+    else:
+        _REGISTRY[base.id] = (cls, "")
     return cls
 
 
 def get_scenario(scenario_id: str) -> Scenario:
-    cls = _REGISTRY[scenario_id]
+    cls, role = _REGISTRY[scenario_id]
     instance = cls()
+    instance.role = role
     instance.setup()
     return instance
 
 
 def list_scenarios() -> list[dict]:
     result = []
-    for cls in _REGISTRY.values():
+    for scenario_id, (cls, role) in _REGISTRY.items():
         s = cls()
+        s.role = role
         result.append({
-            "id": s.id,
+            "id": scenario_id,
             "unit": s.unit,
-            "title": s.title,
+            "title": s.role_display_title(),
             "grammar": s.grammar,
         })
     result.sort(key=lambda x: (x["unit"], x["title"]))
