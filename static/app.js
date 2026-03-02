@@ -175,9 +175,6 @@ function Briefing({ briefing, onStart, onBack }) {
         <div class="wireframe-label">Your role</div>
         <div class="role-name">${ctx.role}</div>
         <div class="role-detail">${ctx.detail}</div>
-        ${ctx.friend_status && html`
-          <div class="role-detail" style="margin-top: 0.25rem; font-style: italic">${ctx.friend_status}</div>
-        `}
       </div>
 
       <div class="wireframe-label">Grammar points</div>
@@ -393,7 +390,7 @@ function Conversation({ briefing, onEnd }) {
           <button class="btn btn-outline" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onClick=${onEnd}>End</button>
         </div>
         <div class="context-bar">
-          <strong>${briefing.context.role}</strong> — ${briefing.context.detail}${briefing.context.friend_status ? html` · <em>${briefing.context.friend_status}</em>` : ''}
+          <strong>${briefing.context.role}</strong> — ${briefing.context.detail}
         </div>
       </div>
 

@@ -62,13 +62,15 @@ class PhoneCallScenario(Scenario):
         )
 
     def setup(self):
+        available = random.choice([True, False])
+        activity = random.choice(PHONE_ACTIVITIES) if not available else None
         self._context = {
             "caller_name": "재민",
-            "friend_name": "소피아",
-            "activity_dict": "샤워하다",
-            "activity_progressive": "샤워하고 있어요",
-            "activity_english": "showering",
-            "available": False,
+            "friend_name": "유나",
+            "activity_dict": activity[0] if activity else None,
+            "activity_progressive": activity[1] if activity else None,
+            "activity_english": activity[2] if activity else None,
+            "available": available,
         }
 
     def vocab_section(self) -> str:
@@ -128,11 +130,8 @@ vocabulary mistake (not a transcription error)."""
         b["context"] = {
             "role": f"You are {c['caller_name']}",
             "detail": f"Calling {c['friend_name']}'s house",
-            "friend_status": (
-                f"{c['friend_name']} is available"
-                if c["available"]
-                else f"{c['friend_name']} is {c['activity_english']} ({c['activity_progressive']})"
-            ),
+            "caller_name": c["caller_name"],
+            "friend_name": c["friend_name"],
         }
         b["key_vocab"] = [
             ("여보세요", "hello (phone)"),
