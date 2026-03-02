@@ -23,6 +23,12 @@ vocabulary list provided below. Do not introduce grammar or words
 from higher levels, even if they would make the conversation more
 natural. The learner is practicing specific patterns from their
 textbook.
+
+HINTS: When using the correct() tool, write hints in ENGLISH with
+Korean examples inline. The learner is a beginner and cannot read
+long Korean sentences. For example: "When someone tells you their
+friend isn't available, you should acknowledge with '네, 알겠습니다'
+(I understand) before saying goodbye."
 """
 
 
