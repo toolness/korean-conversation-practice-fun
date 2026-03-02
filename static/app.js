@@ -73,11 +73,12 @@ async function startScenario(id) {
   return res.json();
 }
 
-async function sendChat(text, sessionId) {
+async function sendChat(text, sessionId, signal) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, session_id: sessionId }),
+    signal,
   });
   return res.json();
 }
@@ -210,6 +211,7 @@ function Conversation({ briefing, onEnd }) {
   const [pttState, setPttState] = useState('idle');
   const chatEndRef = useRef(null);
   const recRef = useRef(null);
+  const abortRef = useRef(null);
 
   // Smooth scroll to bottom when messages change
   useEffect(() => {
@@ -218,23 +220,24 @@ function Conversation({ briefing, onEnd }) {
     }
   }, [messages, sending]);
 
-  // Keyboard listener for hold-to-talk (non-dev mode only)
+  // Keyboard listeners
   useEffect(() => {
-    if (DEV_MODE) return;
-
     function onKeyDown(e) {
       if (e.repeat) return;
-      if (e.key === ' ' && pttState === 'idle' && !sending) {
+      if (e.key === 'Escape' && sending) {
+        e.preventDefault();
+        cancelSend();
+      } else if (!DEV_MODE && e.key === ' ' && pttState === 'idle' && !sending) {
         e.preventDefault();
         startRecording();
-      } else if (e.key === 'Escape' && pttState === 'recording') {
+      } else if (!DEV_MODE && e.key === 'Escape' && pttState === 'recording') {
         e.preventDefault();
         cancelRecording();
       }
     }
 
     function onKeyUp(e) {
-      if (e.key === ' ' && pttState === 'recording') {
+      if (!DEV_MODE && e.key === ' ' && pttState === 'recording') {
         e.preventDefault();
         stopAndSendRecording();
       }
@@ -247,6 +250,17 @@ function Conversation({ briefing, onEnd }) {
       window.removeEventListener('keyup', onKeyUp);
     };
   }, [pttState, sending, sessionId]);
+
+  function cancelSend() {
+    if (abortRef.current) abortRef.current.abort();
+    // Remove the last learner message
+    setMessages(prev => {
+      const last = prev.length - 1;
+      if (last >= 0 && prev[last].role === 'learner') return prev.slice(0, last);
+      return prev;
+    });
+    setSending(false);
+  }
 
   async function startRecording() {
     setPttState('recording');
@@ -346,10 +360,13 @@ function Conversation({ briefing, onEnd }) {
     setInput('');
     setSending(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setMessages(prev => [...prev, { role: 'learner', text: userText, hints: [] }]);
 
     try {
-      const data = await sendChat(userText, sessionId);
+      const data = await sendChat(userText, sessionId, controller.signal);
 
       for (const event of data.events) {
         if (event.type === 'session_id') {
@@ -362,9 +379,11 @@ function Conversation({ briefing, onEnd }) {
         }
       }
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Chat error:', err);
       setMessages(prev => [...prev, { role: 'partner', text: '(Connection error — try again)' }]);
     }
+    abortRef.current = null;
     setSending(false);
   }
 
@@ -418,7 +437,7 @@ function Conversation({ briefing, onEnd }) {
           </div>
         `)}
         ${sending && html`
-          <div style="color: var(--muted); font-size: 0.8rem; padding: 0.25rem 0.5rem;">Thinking...</div>
+          <div style="color: var(--muted); font-size: 0.8rem; padding: 0.25rem 0.5rem;">Thinking... <span style="font-size: 0.7rem;">(Esc to cancel)</span></div>
         `}
         <div ref=${chatEndRef}></div>
       </div>
