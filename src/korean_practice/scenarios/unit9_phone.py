@@ -195,9 +195,14 @@ vocabulary mistake (not a transcription error)."""
             ]
             b["start_hint"] = 'Say "여보세요" to begin the phone call.'
         else:
+            if c["available"]:
+                detail = f"Answering a call from {c['caller_name']} — {c['friend_name']} is home"
+            else:
+                detail = (f"Answering a call from {c['caller_name']} — "
+                          f"{c['friend_name']} is {c['activity_english']}")
             b["context"] = {
                 "role": f"Family member at {c['friend_name']}'s house",
-                "detail": f"Answering a call from {c['caller_name']}",
+                "detail": detail,
                 "caller_name": c["caller_name"],
                 "friend_name": c["friend_name"],
             }
