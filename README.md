@@ -33,19 +33,19 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 brew install whisper-cpp
 ```
 
-You also need a whisper model file. The app uses `ggml-large-v3-turbo.bin` by default:
+You also need a whisper model file. The app looks for it in `whisper-models/` in the project directory by default. Browse available models at https://huggingface.co/ggerganov/whisper.cpp/tree/main.
 
 ```bash
-# Download the model (~1.5 GB)
-mkdir -p ~/whisper-models
-cd ~/whisper-models
-curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+# Download the recommended model (~1.5 GB)
+mkdir -p whisper-models
+curl -L -o whisper-models/ggml-large-v3-turbo.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
 ```
 
-Tell the app where to find it:
+Or point to a model elsewhere:
 
 ```bash
-export WHISPER_MODEL=~/whisper-models/ggml-large-v3-turbo.bin
+export WHISPER_MODEL=/path/to/your/ggml-model.bin
 ```
 
 ### Anthropic API key

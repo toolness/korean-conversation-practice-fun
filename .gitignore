@@ -7,3 +7,4 @@ build/
 last_utterance.wav
 .claude/
 uv.lock
+whisper-models/

@@ -8,9 +8,11 @@ from pathlib import Path
 
 import os
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 MODEL_PATH = Path(os.environ.get(
     "WHISPER_MODEL",
-    Path.home() / "Documents/explorations/audio-assistant-fun/models/ggml-large-v3-turbo.bin",
+    _PROJECT_ROOT / "whisper-models/ggml-large-v3-turbo.bin",
 ))
 
 
