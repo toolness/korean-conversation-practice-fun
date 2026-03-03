@@ -109,6 +109,8 @@ h2 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-success:hover:not(:disabled) { background: #15803d; }
 .btn-outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
 .btn-outline:hover:not(:disabled) { background: var(--gray-light); }
 

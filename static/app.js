@@ -492,8 +492,9 @@ function Conversation({ briefing, onEnd }) {
         ` : awaitingStart ? html`
           <div style="text-align: center; padding: 1rem 0;">
             <button
-              class="btn btn-primary"
+              class="btn btn-success"
               style="font-size: 1rem; padding: 0.5rem 1.5rem;"
+              autoFocus
               onClick=${handleAutoStart}
             >Start</button>
           </div>
