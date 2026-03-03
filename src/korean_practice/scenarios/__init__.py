@@ -33,6 +33,14 @@ friend isn't available, you should acknowledge with '네, 알겠습니다'
 
 
 @dataclass
+class ScriptStep:
+    """One line of dialogue in a conversation script."""
+    speaker: str           # "A" or "B" — role-agnostic label
+    description: str       # English description + grammar patterns to use
+    resolved_text: str = ""  # Filled by resolution phase (actual Korean)
+
+
+@dataclass
 class Scenario:
     id: str
     unit: int
@@ -51,6 +59,14 @@ class Scenario:
         """Title for the scenario list. Override for role-specific titles."""
         return self.title
 
+    def conversation_script(self) -> list[ScriptStep]:
+        """Return the scripted conversation steps. Override in subclasses."""
+        return []
+
+    def learner_speaker(self) -> str:
+        """Which speaker label ('A' or 'B') is the learner. Override in subclasses."""
+        return "A"
+
     def setup(self) -> None:
         """Randomize context for this scenario. Override in subclasses."""
 
@@ -58,20 +74,11 @@ class Scenario:
         """Return formatted vocabulary for the system prompt. Override in subclasses."""
         return ""
 
-    def scenario_instructions(self) -> str:
-        """Return scenario-specific agent instructions. Override in subclasses."""
-        return ""
-
     def system_prompt(self) -> str:
         examples = self._format_examples()
         vocab = self.vocab_section()
-        instructions = self.scenario_instructions()
 
-        parts = [
-            instructions,
-            "",
-            STT_CHARITY_ADDENDUM,
-        ]
+        parts = [STT_CHARITY_ADDENDUM]
         if vocab:
             parts.extend(["", "=== VOCABULARY ===", vocab])
         if examples:

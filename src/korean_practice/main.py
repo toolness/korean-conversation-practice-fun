@@ -66,6 +66,8 @@ async def chat(request: Request):
                 yield f"data: {json.dumps({'type': 'speak', 'text': event.text})}\n\n"
             elif event.type == "correct":
                 yield f"data: {json.dumps({'type': 'correct', 'hint': event.hint})}\n\n"
+            elif event.type == "complete":
+                yield f'data: {{"type": "complete"}}\n\n'
             elif event.type == "done":
                 yield f'data: {{"type": "done"}}\n\n'
 

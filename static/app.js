@@ -223,6 +223,7 @@ function Conversation({ briefing, onEnd }) {
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [pttState, setPttState] = useState('idle');
+  const [completed, setCompleted] = useState(false);
   const chatEndRef = useRef(null);
   const recRef = useRef(null);
   const abortRef = useRef(null);
@@ -398,6 +399,8 @@ function Conversation({ briefing, onEnd }) {
           speak(event.text);
         } else if (event.type === 'correct') {
           addHintToLastLearner(event.hint);
+        } else if (event.type === 'complete') {
+          setCompleted(true);
         }
       });
     } catch (err) {
@@ -465,7 +468,12 @@ function Conversation({ briefing, onEnd }) {
       </div>
 
       <div class="conv-footer">
-        ${DEV_MODE ? html`
+        ${completed ? html`
+          <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">Conversation complete!</div>
+            <div style="font-size: 0.85rem; color: var(--muted);">Nice work. Choose another scenario to keep practicing.</div>
+          </div>
+        ` : DEV_MODE ? html`
           <div class="dev-input">
             <input
               type="text"
