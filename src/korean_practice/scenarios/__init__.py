@@ -153,3 +153,4 @@ def list_scenarios() -> list[dict]:
 
 # Import scenario modules to trigger registration
 from korean_practice.scenarios import unit9_phone  # noqa: E402, F401
+from korean_practice.scenarios import scratchpad  # noqa: E402, F401

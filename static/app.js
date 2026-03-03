@@ -328,8 +328,11 @@ function Conversation({ briefing, onEnd }) {
       const targetRate = 16000;
       const downsampled = downsample(merged, sampleRate, targetRate);
       const wavBlob = encodeWAV(downsampled, targetRate);
-      const names = [briefing.context.caller_name, briefing.context.friend_name].filter(Boolean).join(', ');
-      const prompt = `여보세요, 거기 ${briefing.context.friend_name || ''} 씨 집이지요? ${names}`;
+      const ctx = briefing.context || {};
+      const names = [ctx.caller_name, ctx.friend_name].filter(Boolean).join(', ');
+      const prompt = names
+        ? `여보세요, 거기 ${ctx.friend_name || ''} 씨 집이지요? ${names}`
+        : '한국어';
       const text = await transcribeAudio(wavBlob, prompt);
       setPttState('idle');
       if (text && text.trim()) {
@@ -358,6 +361,13 @@ function Conversation({ briefing, onEnd }) {
     if (!text.trim() || sending) return;
     const userText = text.trim();
     setInput('');
+
+    // Scratchpad: just display transcribed text, no backend call
+    if (briefing.scratchpad) {
+      setMessages(prev => [...prev, { role: 'learner', text: userText, hints: [] }]);
+      return;
+    }
+
     setSending(true);
 
     const controller = new AbortController();
@@ -415,24 +425,26 @@ function Conversation({ briefing, onEnd }) {
           <h2 style="margin: 0; border: none; padding: 0; font-size: 1.1rem;">${briefing.title}</h2>
           <button class="btn btn-outline" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onClick=${onEnd}>End</button>
         </div>
-        <div class="context-bar">
-          <strong>${briefing.context.role}</strong> — ${briefing.context.detail}
-        </div>
-        <details class="briefing-details">
-          <summary>Briefing</summary>
-          <div class="wireframe-label">Grammar points</div>
-          <p style="font-size: 0.85rem; margin: 0.25rem 0 0;">${briefing.grammar.join(' · ')}</p>
-          ${briefing.key_vocab && html`
-            <div>
-              <div class="wireframe-label">Key vocabulary</div>
+        ${!briefing.scratchpad && html`
+          <div class="context-bar">
+            <strong>${briefing.context.role}</strong> — ${briefing.context.detail}
+          </div>
+          <details class="briefing-details">
+            <summary>Briefing</summary>
+            <div class="wireframe-label">Grammar points</div>
+            <p style="font-size: 0.85rem; margin: 0.25rem 0 0;">${briefing.grammar.join(' · ')}</p>
+            ${briefing.key_vocab && html`
               <div>
-                ${briefing.key_vocab.map(([kr, en]) => html`
-                  <span class="vocab-pill" key=${kr}>${kr} — ${en}</span>
-                `)}
+                <div class="wireframe-label">Key vocabulary</div>
+                <div>
+                  ${briefing.key_vocab.map(([kr, en]) => html`
+                    <span class="vocab-pill" key=${kr}>${kr} — ${en}</span>
+                  `)}
+                </div>
               </div>
-            </div>
-          `}
-        </details>
+            `}
+          </details>
+        `}
       </div>
 
       <div class="conv-messages">
@@ -465,7 +477,7 @@ function Conversation({ briefing, onEnd }) {
       </div>
 
       <div class="conv-footer">
-        ${completed ? html`
+        ${completed && !briefing.scratchpad ? html`
           <div style="text-align: center; padding: 1rem 0;">
             <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">Conversation complete!</div>
             <div style="font-size: 0.85rem; color: var(--muted);">Nice work. Choose another scenario to keep practicing.</div>
