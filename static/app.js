@@ -224,6 +224,9 @@ function Conversation({ briefing, onEnd }) {
   const [sessionId, setSessionId] = useState(null);
   const [pttState, setPttState] = useState('idle');
   const [completed, setCompleted] = useState(false);
+  const [awaitingStart, setAwaitingStart] = useState(!!briefing.auto_start);
+  const awaitingStartRef = useRef(!!briefing.auto_start);
+  const pendingTTSRef = useRef([]);
   const chatEndRef = useRef(null);
   const recRef = useRef(null);
   const abortRef = useRef(null);
@@ -282,6 +285,15 @@ function Conversation({ briefing, onEnd }) {
       return prev;
     });
     setSending(false);
+  }
+
+  function handleAutoStart() {
+    awaitingStartRef.current = false;
+    setAwaitingStart(false);
+    for (const text of pendingTTSRef.current) {
+      speak(text);
+    }
+    pendingTTSRef.current = [];
   }
 
   async function startRecording() {
@@ -396,7 +408,11 @@ function Conversation({ briefing, onEnd }) {
           setSessionId(event.session_id);
         } else if (event.type === 'speak') {
           setMessages(prev => [...prev, { role: 'partner', text: event.text }]);
-          speak(event.text);
+          if (awaitingStartRef.current) {
+            pendingTTSRef.current.push(event.text);
+          } else {
+            speak(event.text);
+          }
         } else if (event.type === 'correct') {
           addHintToLastLearner(event.hint);
         } else if (event.type === 'complete') {
@@ -472,6 +488,14 @@ function Conversation({ briefing, onEnd }) {
           <div style="text-align: center; padding: 1rem 0;">
             <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">Conversation complete!</div>
             <div style="font-size: 0.85rem; color: var(--muted);">Nice work. Choose another scenario to keep practicing.</div>
+          </div>
+        ` : awaitingStart ? html`
+          <div style="text-align: center; padding: 1rem 0;">
+            <button
+              class="btn btn-primary"
+              style="font-size: 1rem; padding: 0.5rem 1.5rem;"
+              onClick=${handleAutoStart}
+            >Start</button>
           </div>
         ` : DEV_MODE ? html`
           <div class="dev-input">
