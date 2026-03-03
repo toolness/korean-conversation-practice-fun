@@ -179,40 +179,6 @@ function ScenarioSelect({ onSelect }) {
   `;
 }
 
-// ─── Briefing Screen ──────────────────────────────────────────────────
-function Briefing({ briefing, onStart, onBack }) {
-  const ctx = briefing.context;
-  return html`
-    <div>
-      <h1>${briefing.title}</h1>
-
-      <div class="briefing-box">
-        <div class="wireframe-label">Your role</div>
-        <div class="role-name">${ctx.role}</div>
-        <div class="role-detail">${ctx.detail}</div>
-      </div>
-
-      <div class="wireframe-label">Grammar points</div>
-      <p style="font-size: 0.9rem;">${briefing.grammar.join(' · ')}</p>
-
-      ${briefing.key_vocab && html`
-        <div>
-          <div class="wireframe-label" style="margin-top: 0.75rem;">Key vocabulary</div>
-          <div>
-            ${briefing.key_vocab.map(([kr, en]) => html`
-              <span class="vocab-pill" key=${kr}>${kr} — ${en}</span>
-            `)}
-          </div>
-        </div>
-      `}
-
-      <div style="margin-top: 1.25rem; display: flex; gap: 0.5rem;">
-        <button class="btn btn-outline" onClick=${onBack}>Back</button>
-        <button class="btn btn-primary" onClick=${onStart}>Start Conversation</button>
-      </div>
-    </div>
-  `;
-}
 
 // ─── Conversation Screen ──────────────────────────────────────────────
 function Conversation({ briefing, onEnd }) {
@@ -452,6 +418,21 @@ function Conversation({ briefing, onEnd }) {
         <div class="context-bar">
           <strong>${briefing.context.role}</strong> — ${briefing.context.detail}
         </div>
+        <details class="briefing-details">
+          <summary>Briefing</summary>
+          <div class="wireframe-label">Grammar points</div>
+          <p style="font-size: 0.85rem; margin: 0.25rem 0 0;">${briefing.grammar.join(' · ')}</p>
+          ${briefing.key_vocab && html`
+            <div>
+              <div class="wireframe-label">Key vocabulary</div>
+              <div>
+                ${briefing.key_vocab.map(([kr, en]) => html`
+                  <span class="vocab-pill" key=${kr}>${kr} — ${en}</span>
+                `)}
+              </div>
+            </div>
+          `}
+        </details>
       </div>
 
       <div class="conv-messages">
@@ -548,7 +529,8 @@ function parseHash() {
   const h = location.hash.replace(/^#\/?/, '');
   if (!h) return { screen: 'select', scenarioId: null };
   const [screen, scenarioId] = h.split('/');
-  return { screen: screen || 'select', scenarioId: scenarioId || null };
+  const s = screen || 'select';
+  return { screen: s === 'briefing' ? 'conversation' : s, scenarioId: scenarioId || null };
 }
 
 function navigate(screen, scenarioId) {
@@ -595,13 +577,8 @@ function App() {
     const b = await startScenario(id);
     setBriefing(b);
     setScenarioId(id);
-    setScreen('briefing');
-    navigate('briefing', id);
-  }
-
-  function handleStart() {
     setScreen('conversation');
-    navigate('conversation', scenarioId);
+    navigate('conversation', id);
   }
 
   function handleBack() {
@@ -617,9 +594,6 @@ function App() {
   switch (screen) {
     case 'select':
       content = html`<${ScenarioSelect} onSelect=${handleSelect} />`;
-      break;
-    case 'briefing':
-      content = html`<${Briefing} briefing=${briefing} onStart=${handleStart} onBack=${handleBack} />`;
       break;
     case 'conversation':
       content = html`<${Conversation} briefing=${briefing} onEnd=${handleBack} />`;

@@ -157,6 +157,16 @@ h2 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
   font-size: 0.8rem;
   margin-top: 0.5rem;
 }
+.briefing-details {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+.briefing-details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.briefing-details .wireframe-label { margin-top: 0.5rem; }
 .chat-bubble {
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius);
