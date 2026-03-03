@@ -6,7 +6,7 @@ import { downsample, encodeWAV, parseHash } from './utils.js';
 const html = htm.bind(h);
 
 const DEV_MODE = new URLSearchParams(location.search).has('dev');
-const EASY_MODE = new URLSearchParams(location.search).has('easy');
+const _EASY_MODE_INIT = new URLSearchParams(location.search).has('easy');
 
 // ─── TTS ───────────────────────────────────────────────────────────────
 const VOICE_PRIORITY = [
@@ -114,7 +114,7 @@ async function transcribeAudio(blob, prompt) {
 // downsample and encodeWAV are in utils.js
 
 // ─── Scenario Select Screen ───────────────────────────────────────────
-function ScenarioSelect({ onSelect }) {
+function ScenarioSelect({ onSelect, easyMode, onToggleEasy }) {
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,6 +135,10 @@ function ScenarioSelect({ onSelect }) {
     <div>
       <h1>Korean Conversation Practice</h1>
       <p class="subtitle">Choose a scenario to practice</p>
+      <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; font-size: 0.9rem;">
+        <input type="checkbox" checked=${easyMode} onChange=${onToggleEasy} />
+        Easy mode <span style="color: var(--muted); font-size: 0.8rem;">— shows what to say next</span>
+      </label>
       ${Object.entries(byUnit).map(([unit, items]) => html`
         <div key=${unit}>
           <div class="wireframe-label">Unit ${unit}</div>
@@ -152,7 +156,7 @@ function ScenarioSelect({ onSelect }) {
 
 
 // ─── Conversation Screen ──────────────────────────────────────────────
-function Conversation({ briefing, onEnd }) {
+function Conversation({ briefing, onEnd, easyMode }) {
   // Messages: { role, text, hints? }
   // Hints are attached to the learner message they pertain to
   const [messages, setMessages] = useState([]);
@@ -370,7 +374,7 @@ function Conversation({ briefing, onEnd }) {
           setExpectedText(null);
           setCompleted(true);
         }
-      }, EASY_MODE);
+      }, easyMode);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Chat error:', err);
@@ -453,7 +457,7 @@ function Conversation({ briefing, onEnd }) {
       </div>
 
       <div class="conv-footer">
-        ${EASY_MODE && expectedText && html`
+        ${easyMode && expectedText && html`
           <div style="background: var(--bg-alt, #f0f4f8); border: 1px solid var(--border, #ddd); border-radius: 0.5rem; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;">
             <div class="wireframe-label">Say this:</div>
             <div style="font-size: 1.3rem; text-align: center; padding: 0.25rem 0; font-weight: 500;">${expectedText}</div>
@@ -537,6 +541,7 @@ function App() {
   const [scenarioId, setScenarioId] = useState(initial.scenarioId);
   const [briefing, setBriefing] = useState(null);
   const [loading, setLoading] = useState(!!initial.scenarioId);
+  const [easyMode, setEasyMode] = useState(_EASY_MODE_INIT);
 
   // On first load, if URL has a scenario, fetch its briefing
   useEffect(() => {
@@ -583,10 +588,10 @@ function App() {
   let content;
   switch (screen) {
     case 'select':
-      content = html`<${ScenarioSelect} onSelect=${handleSelect} />`;
+      content = html`<${ScenarioSelect} onSelect=${handleSelect} easyMode=${easyMode} onToggleEasy=${() => setEasyMode(e => !e)} />`;
       break;
     case 'conversation':
-      content = html`<${Conversation} briefing=${briefing} onEnd=${handleBack} />`;
+      content = html`<${Conversation} briefing=${briefing} onEnd=${handleBack} easyMode=${easyMode} />`;
       break;
   }
 
