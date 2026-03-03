@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -23,7 +24,17 @@ log = logging.getLogger(__name__)
 _log_prompts = os.environ.get("LOG_PROMPTS") is not None
 
 # ─── Long-lived Claude Code CLI process ────────────────────────────────
+_CLIENT_OPTS = ClaudeAgentOptions(
+    model="claude-sonnet-4-6",
+    permission_mode="bypassPermissions",
+    tools=[],
+    max_turns=1,
+    extra_args={"no-session-persistence": None},
+)
+
 _client: ClaudeSDKClient | None = None
+_client_lock = asyncio.Lock()
+_LLM_TIMEOUT = 30  # seconds
 
 
 async def boot_client():
@@ -32,14 +43,7 @@ async def boot_client():
     os.environ.pop("CLAUDECODE", None)
     t0 = time.monotonic()
     log.info("boot_client: starting Claude Code CLI...")
-    opts = ClaudeAgentOptions(
-        model="claude-sonnet-4-6",
-        permission_mode="bypassPermissions",
-        tools=[],
-        max_turns=1,
-        extra_args={"no-session-persistence": None},
-    )
-    _client = ClaudeSDKClient(opts)
+    _client = ClaudeSDKClient(_CLIENT_OPTS)
     await _client.connect()
     log.info("boot_client: ready in %.1fs", time.monotonic() - t0)
 
@@ -50,6 +54,49 @@ async def shutdown_client():
     if _client:
         await _client.disconnect()
         _client = None
+
+
+async def _send_prompt(prompt: str, label: str) -> str:
+    """Send a prompt to the LLM and return the text response.
+
+    Serialized via lock and protected by a timeout. On timeout,
+    disconnects and reconnects the client subprocess, then re-raises.
+    """
+    global _client
+    async with _client_lock:
+        t0 = time.monotonic()
+        log.info("%s: sending prompt (%d chars)", label, len(prompt))
+        if _log_prompts:
+            log.info("%s prompt:\n%s", label, prompt)
+        try:
+            async with asyncio.timeout(_LLM_TIMEOUT):
+                await _client.query(prompt, session_id=uuid.uuid4().hex)
+                result_text = ""
+                first_token = None
+                async for message in _client.receive_response():
+                    if isinstance(message, AssistantMessage):
+                        for block in message.content:
+                            if isinstance(block, TextBlock):
+                                if first_token is None:
+                                    first_token = time.monotonic()
+                                    log.info("%s: first token in %.1fs", label, first_token - t0)
+                                result_text += block.text
+                    elif isinstance(message, ResultMessage):
+                        log.info("%s: usage=%s", label, message.usage)
+        except TimeoutError:
+            log.error("%s: timed out after %ds, reconnecting client...", label, _LLM_TIMEOUT)
+            try:
+                await _client.disconnect()
+            except Exception:
+                pass
+            _client = ClaudeSDKClient(_CLIENT_OPTS)
+            await _client.connect()
+            raise
+
+        t_done = time.monotonic()
+        result_text = result_text.strip()
+        log.info("%s: done in %.1fs — %s", label, t_done - t0, result_text[:80])
+        return result_text
 
 
 @dataclass
@@ -163,27 +210,7 @@ HINT: <your hint>
 OFF: <your redirect>"""
 
         try:
-            t0 = time.monotonic()
-            log.info("_classify: sending prompt (%d chars)", len(prompt))
-            if _log_prompts:
-                log.info("_classify prompt:\n%s", prompt)
-            await _client.query(prompt, session_id=uuid.uuid4().hex)
-            result_text = ""
-            first_token = None
-            async for message in _client.receive_response():
-                if isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            if first_token is None:
-                                first_token = time.monotonic()
-                                log.info("_classify: first token in %.1fs", first_token - t0)
-                            result_text += block.text
-                elif isinstance(message, ResultMessage):
-                    log.info("_classify: usage=%s", message.usage)
-
-            t_done = time.monotonic()
-            result_text = result_text.strip()
-            log.info("_classify: done in %.1fs — %s", t_done - t0, result_text[:80])
+            result_text = await _send_prompt(prompt, "_classify")
 
             if result_text.startswith("MATCH"):
                 return "MATCH"
@@ -243,28 +270,8 @@ INSTRUCTIONS:
 Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네, 그런데요. 실례지만 누구세요?", ...]"""
 
     try:
-        t0 = time.monotonic()
-        log.info("resolve_script: sending prompt (%d chars, %d steps)", len(prompt), len(script))
-        if _log_prompts:
-            log.info("resolve_script prompt:\n%s", prompt)
-        await _client.query(prompt, session_id=uuid.uuid4().hex)
-        result_text = ""
-        first_token = None
-        async for message in _client.receive_response():
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        if first_token is None:
-                            first_token = time.monotonic()
-                            log.info("resolve_script: first token in %.1fs", first_token - t0)
-                        result_text += block.text
-            elif isinstance(message, ResultMessage):
-                log.info("resolve_script: usage=%s", message.usage)
+        result_text = await _send_prompt(prompt, "resolve_script")
 
-        t_done = time.monotonic()
-        log.info("resolve_script: done in %.1fs (%.1fs to first token)", t_done - t0, (first_token or t_done) - t0)
-
-        result_text = result_text.strip()
         # Strip markdown code fences if present
         if result_text.startswith("```"):
             result_text = result_text.split("\n", 1)[1] if "\n" in result_text else result_text[3:]
@@ -291,7 +298,7 @@ Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네,
         for step, sentence in zip(script, sentences):
             step.resolved_text = sentence
 
-        log.info("resolve_script: total %.1fs — %s", time.monotonic() - t0, [s.resolved_text for s in script])
+        log.info("resolve_script: resolved %d steps — %s", len(script), [s.resolved_text for s in script])
         return script
 
     except Exception as e:
