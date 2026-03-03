@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from korean_practice.agent import conversation_manager
+from korean_practice.agent import boot_client, conversation_manager, shutdown_client
 from korean_practice.scenarios import get_scenario, list_scenarios
 from korean_practice.stt import transcribe
 
@@ -21,6 +21,16 @@ STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
 _active_scenarios: dict[str, object] = {}
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup():
+    await boot_client()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await shutdown_client()
 
 
 @app.get("/api/health")

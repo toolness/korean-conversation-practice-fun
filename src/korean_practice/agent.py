@@ -9,9 +9,46 @@ import time
 import uuid
 from dataclasses import dataclass
 
+from claude_agent_sdk import (
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ClaudeSDKClient,
+    ResultMessage,
+    TextBlock,
+)
+
 from korean_practice.scenarios import STT_CHARITY_ADDENDUM, Scenario, ScriptStep
 
 log = logging.getLogger(__name__)
+
+# ─── Long-lived Claude Code CLI process ────────────────────────────────
+_client: ClaudeSDKClient | None = None
+
+
+async def boot_client():
+    """Start the shared Claude Code CLI subprocess. Call once at server startup."""
+    global _client
+    os.environ.pop("CLAUDECODE", None)
+    t0 = time.monotonic()
+    log.info("boot_client: starting Claude Code CLI...")
+    opts = ClaudeAgentOptions(
+        model="claude-sonnet-4-6",
+        permission_mode="bypassPermissions",
+        tools=[],
+        max_turns=1,
+        extra_args={"no-session-persistence": None},
+    )
+    _client = ClaudeSDKClient(opts)
+    await _client.connect()
+    log.info("boot_client: ready in %.1fs", time.monotonic() - t0)
+
+
+async def shutdown_client():
+    """Disconnect the shared CLI subprocess. Call on server shutdown."""
+    global _client
+    if _client:
+        await _client.disconnect()
+        _client = None
 
 
 @dataclass
@@ -91,15 +128,6 @@ class ScriptRunner:
 
         Returns "MATCH" or a hint string.
         """
-        os.environ.pop("CLAUDECODE", None)
-
-        from claude_agent_sdk import (
-            AssistantMessage,
-            ClaudeAgentOptions,
-            TextBlock,
-            query,
-        )
-
         history_str = ""
         if self.history:
             lines = []
@@ -109,6 +137,8 @@ class ScriptRunner:
             history_str = "Conversation so far:\n" + "\n".join(lines) + "\n\n"
 
         prompt = f"""\
+You are a Korean language utterance classifier. Respond only with MATCH, HINT: <hint>, or OFF: <redirect>.
+
 You are evaluating a Korean language learner's spoken response.
 
 {history_str}The learner was expected to say something like: "{step.resolved_text}"
@@ -131,18 +161,13 @@ MATCH
 HINT: <your hint>
 OFF: <your redirect>"""
 
-        options = ClaudeAgentOptions(
-            model="claude-sonnet-4-6",
-            system_prompt="You are a Korean language utterance classifier. Respond only with MATCH, HINT: <hint>, or OFF: <redirect>.",
-            permission_mode="bypassPermissions",
-        )
-
         try:
             t0 = time.monotonic()
-            log.info("_classify: starting SDK query")
+            log.info("_classify: sending prompt (%d chars)", len(prompt))
+            await _client.query(prompt, session_id=uuid.uuid4().hex)
             result_text = ""
             first_token = None
-            async for message in query(prompt=prompt, options=options):
+            async for message in _client.receive_response():
                 if isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock):
@@ -150,10 +175,12 @@ OFF: <your redirect>"""
                                 first_token = time.monotonic()
                                 log.info("_classify: first token in %.1fs", first_token - t0)
                             result_text += block.text
+                elif isinstance(message, ResultMessage):
+                    log.info("_classify: usage=%s", message.usage)
 
             t_done = time.monotonic()
             result_text = result_text.strip()
-            log.info("_classify: SDK query done in %.1fs — %s", t_done - t0, result_text[:80])
+            log.info("_classify: done in %.1fs — %s", t_done - t0, result_text[:80])
 
             if result_text.startswith("MATCH"):
                 return "MATCH"
@@ -171,15 +198,6 @@ OFF: <your redirect>"""
 
 async def resolve_script(scenario: Scenario) -> list[ScriptStep]:
     """Use LLM to resolve script step descriptions into actual Korean sentences."""
-    os.environ.pop("CLAUDECODE", None)
-
-    from claude_agent_sdk import (
-        AssistantMessage,
-        ClaudeAgentOptions,
-        TextBlock,
-        query,
-    )
-
     script = scenario.conversation_script()
     context_info = scenario._context
 
@@ -192,6 +210,8 @@ async def resolve_script(scenario: Scenario) -> list[ScriptStep]:
     vocab = scenario.vocab_section()
 
     prompt = f"""\
+You produce Korean dialogue sentences. Respond ONLY with a JSON array of strings.
+
 You are generating Korean dialogue for a language practice app.
 
 CONTEXT:
@@ -219,18 +239,13 @@ INSTRUCTIONS:
 
 Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네, 그런데요. 실례지만 누구세요?", ...]"""
 
-    options = ClaudeAgentOptions(
-        model="claude-sonnet-4-6",
-        system_prompt="You produce Korean dialogue sentences. Respond ONLY with a JSON array of strings.",
-        permission_mode="bypassPermissions",
-    )
-
     try:
         t0 = time.monotonic()
-        log.info("resolve_script: starting SDK query (%d steps)", len(script))
+        log.info("resolve_script: sending prompt (%d chars, %d steps)", len(prompt), len(script))
+        await _client.query(prompt, session_id=uuid.uuid4().hex)
         result_text = ""
         first_token = None
-        async for message in query(prompt=prompt, options=options):
+        async for message in _client.receive_response():
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):
@@ -238,9 +253,11 @@ Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네,
                             first_token = time.monotonic()
                             log.info("resolve_script: first token in %.1fs", first_token - t0)
                         result_text += block.text
+            elif isinstance(message, ResultMessage):
+                log.info("resolve_script: usage=%s", message.usage)
 
         t_done = time.monotonic()
-        log.info("resolve_script: SDK query done in %.1fs (%.1fs to first token)", t_done - t0, (first_token or t_done) - t0)
+        log.info("resolve_script: done in %.1fs (%.1fs to first token)", t_done - t0, (first_token or t_done) - t0)
 
         result_text = result_text.strip()
         # Strip markdown code fences if present
