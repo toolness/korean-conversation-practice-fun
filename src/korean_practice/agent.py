@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -137,14 +138,22 @@ OFF: <your redirect>"""
         )
 
         try:
+            t0 = time.monotonic()
+            log.info("_classify: starting SDK query")
             result_text = ""
+            first_token = None
             async for message in query(prompt=prompt, options=options):
                 if isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock):
+                            if first_token is None:
+                                first_token = time.monotonic()
+                                log.info("_classify: first token in %.1fs", first_token - t0)
                             result_text += block.text
 
+            t_done = time.monotonic()
             result_text = result_text.strip()
+            log.info("_classify: SDK query done in %.1fs — %s", t_done - t0, result_text[:80])
 
             if result_text.startswith("MATCH"):
                 return "MATCH"
@@ -217,12 +226,21 @@ Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네,
     )
 
     try:
+        t0 = time.monotonic()
+        log.info("resolve_script: starting SDK query (%d steps)", len(script))
         result_text = ""
+        first_token = None
         async for message in query(prompt=prompt, options=options):
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):
+                        if first_token is None:
+                            first_token = time.monotonic()
+                            log.info("resolve_script: first token in %.1fs", first_token - t0)
                         result_text += block.text
+
+        t_done = time.monotonic()
+        log.info("resolve_script: SDK query done in %.1fs (%.1fs to first token)", t_done - t0, (first_token or t_done) - t0)
 
         result_text = result_text.strip()
         # Strip markdown code fences if present
@@ -251,7 +269,7 @@ Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네,
         for step, sentence in zip(script, sentences):
             step.resolved_text = sentence
 
-        log.info("Resolved script: %s", [s.resolved_text for s in script])
+        log.info("resolve_script: total %.1fs — %s", time.monotonic() - t0, [s.resolved_text for s in script])
         return script
 
     except Exception as e:
@@ -267,12 +285,13 @@ class ConversationManager:
 
     async def start(self, scenario: Scenario) -> str:
         """Start a new conversation session. Returns session ID."""
+        t0 = time.monotonic()
         script = await resolve_script(scenario)
         runner = ScriptRunner(scenario, script)
 
         sid = uuid.uuid4().hex[:12]
         self._runners[sid] = runner
-        log.info("Started session %s with %d steps", sid, len(script))
+        log.info("Started session %s with %d steps in %.1fs", sid, len(script), time.monotonic() - t0)
         return sid
 
     async def stream(self, session_id: str, text: str):

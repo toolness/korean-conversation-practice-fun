@@ -211,7 +211,7 @@ function Conversation({ briefing, onEnd }) {
       if (e.key === 'Escape' && sending) {
         e.preventDefault();
         cancelSend();
-      } else if (!DEV_MODE && e.key === ' ' && pttState === 'idle' && !sending) {
+      } else if (!DEV_MODE && e.key === ' ' && pttState === 'idle' && !sending && !awaitingStartRef.current) {
         e.preventDefault();
         startRecording();
       } else if (!DEV_MODE && e.key === 'Escape' && pttState === 'recording') {
@@ -496,6 +496,8 @@ function Conversation({ briefing, onEnd }) {
               disabled=${sending || !input.trim()}
             >Send</button>
           </div>
+        ` : sending && !sessionId ? html`
+          <div style="text-align: center; padding: 1rem 0; font-size: 0.85rem; color: var(--muted);">Loading conversation...</div>
         ` : html`
           <div class="ptt-bar">
             <span class="ptt-state ${pttClass}">${pttLabel}</span>
