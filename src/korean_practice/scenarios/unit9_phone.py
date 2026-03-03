@@ -136,7 +136,7 @@ class PhoneCallScenario(Scenario):
                 ("알겠습니다", "I understand"),
                 ("안녕히 계세요", "goodbye"),
             ]
-            b["start_hint"] = 'Say "여보세요" to begin the phone call.'
+            b["start_hint"] = "You're making a call and the other side just picked up. Say something!"
         else:
             if c["available"]:
                 detail = f"Answering a call from {c['caller_name']} — {c['friend_name']} is home"
