@@ -45,15 +45,19 @@ async def _hanging_receive_response():
 # ─── _send_prompt tests ──────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
-def _reset_agent_state():
+def _reset_agent_state(tmp_path):
     """Reset module-level state before each test."""
     original_client = agent._client
     original_timeout = agent._LLM_TIMEOUT
+    original_cache_dir = agent._CACHE_DIR
     # Provide a fresh lock per test to avoid cross-test deadlocks
     agent._client_lock = asyncio.Lock()
+    # Use a temp cache dir so tests don't pollute real cache
+    agent._CACHE_DIR = tmp_path / "test_cache"
     yield
     agent._client = original_client
     agent._LLM_TIMEOUT = original_timeout
+    agent._CACHE_DIR = original_cache_dir
     agent._client_lock = asyncio.Lock()
 
 
@@ -328,3 +332,43 @@ async def test_resolve_script_timeout_propagates():
     with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock, side_effect=TimeoutError):
         with pytest.raises(TimeoutError):
             await agent.resolve_script(scenario)
+
+
+# ─── cache tests ─────────────────────────────────────────────────────
+
+def test_cache_path_deterministic():
+    p1 = agent._cache_path("hello")
+    p2 = agent._cache_path("hello")
+    assert p1 == p2
+
+
+def test_cache_path_differs_for_different_prompts():
+    p1 = agent._cache_path("hello")
+    p2 = agent._cache_path("world")
+    assert p1 != p2
+
+
+def test_cache_miss_returns_none():
+    assert agent._cache_get("nonexistent") is None
+
+
+def test_cache_roundtrip():
+    agent._cache_put("prompt1", "response1")
+    assert agent._cache_get("prompt1") == "response1"
+
+
+async def test_send_prompt_uses_cache():
+    agent._cache_put("test prompt", "cached response")
+    result = await agent._send_prompt("test prompt", "test")
+    assert result == "cached response"
+
+
+async def test_send_prompt_populates_cache():
+    mock_client = _make_mock_client([
+        _make_assistant_msg("fresh response"),
+        _make_result_msg(),
+    ])
+    agent._client = mock_client
+    result = await agent._send_prompt("new prompt", "test")
+    assert result == "fresh response"
+    assert agent._cache_get("new prompt") == "fresh response"

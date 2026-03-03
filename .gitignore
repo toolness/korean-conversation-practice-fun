@@ -6,5 +6,6 @@ dist/
 build/
 last_utterance.wav
 .claude/
+.llm_cache/
 uv.lock
 whisper-models/

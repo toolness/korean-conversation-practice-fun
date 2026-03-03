@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -28,6 +30,30 @@ _log_prompts = os.environ.get("LOG_PROMPTS") is not None
 def strip_to_hangul(text: str) -> str:
     """Keep only Korean syllable blocks (U+AC00-U+D7A3), removing all else."""
     return re.sub(r'[^\uac00-\ud7a3]', '', text)
+
+
+# ─── File-based LLM response cache ───────────────────────────────────
+_CACHE_DIR = Path(__file__).resolve().parent.parent.parent / ".llm_cache"
+
+
+def _cache_path(prompt: str) -> Path:
+    """Return the cache file path for a given prompt."""
+    return _CACHE_DIR / hashlib.sha256(prompt.encode()).hexdigest()
+
+
+def _cache_get(prompt: str) -> str | None:
+    """Return cached response or None."""
+    path = _cache_path(prompt)
+    if path.exists():
+        return path.read_text()
+    return None
+
+
+def _cache_put(prompt: str, response: str) -> None:
+    """Write response to cache."""
+    _CACHE_DIR.mkdir(exist_ok=True)
+    _cache_path(prompt).write_text(response)
+
 
 # ─── Long-lived Claude Code CLI process ────────────────────────────────
 _CLIENT_OPTS = ClaudeAgentOptions(
@@ -65,11 +91,24 @@ async def shutdown_client():
 async def _send_prompt(prompt: str, label: str) -> str:
     """Send a prompt to the LLM and return the text response.
 
-    Serialized via lock and protected by a timeout. On timeout,
-    disconnects and reconnects the client subprocess, then re-raises.
+    Checks file-based cache first. Serialized via lock and protected
+    by a timeout. On timeout, disconnects and reconnects the client
+    subprocess, then re-raises.
     """
+    # Check cache before acquiring lock
+    cached = _cache_get(prompt)
+    if cached is not None:
+        log.info("%s: cache hit (%d chars)", label, len(cached))
+        return cached
+
     global _client
     async with _client_lock:
+        # Double-check cache inside lock (another call may have populated it)
+        cached = _cache_get(prompt)
+        if cached is not None:
+            log.info("%s: cache hit (%d chars)", label, len(cached))
+            return cached
+
         t0 = time.monotonic()
         log.info("%s: sending prompt (%d chars)", label, len(prompt))
         if _log_prompts:
@@ -102,6 +141,7 @@ async def _send_prompt(prompt: str, label: str) -> str:
         t_done = time.monotonic()
         result_text = result_text.strip()
         log.info("%s: done in %.1fs — %s", label, t_done - t0, result_text[:80])
+        _cache_put(prompt, result_text)
         return result_text
 
 
