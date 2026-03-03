@@ -230,6 +230,50 @@ async def test_classify_timeout_returns_error():
     assert "error" in result.lower()
 
 
+# ─── strip_to_hangul tests ───────────────────────────────────────────
+
+def test_strip_to_hangul_removes_punctuation_and_spaces():
+    assert agent.strip_to_hangul("안녕하세요!") == "안녕하세요"
+    assert agent.strip_to_hangul("네, 그런데요.") == "네그런데요"
+
+
+def test_strip_to_hangul_removes_non_korean():
+    assert agent.strip_to_hangul("hello 안녕") == "안녕"
+
+
+def test_strip_to_hangul_empty_string():
+    assert agent.strip_to_hangul("") == ""
+    assert agent.strip_to_hangul("...!? ") == ""
+
+
+# ─── cheap match in _classify ────────────────────────────────────────
+
+async def test_classify_cheap_match_skips_llm():
+    """When hangul-only characters match exactly, no LLM call is made."""
+    runner = _make_runner()
+    with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock) as mock_send:
+        result = await runner._classify("안녕하세요!", runner.script[0])
+    assert result == "MATCH"
+    mock_send.assert_not_called()
+
+
+async def test_classify_cheap_match_ignores_spaces():
+    runner = _make_runner()
+    with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock) as mock_send:
+        result = await runner._classify("안녕 하세요", runner.script[0])
+    assert result == "MATCH"
+    mock_send.assert_not_called()
+
+
+async def test_classify_falls_through_to_llm_on_mismatch():
+    """When hangul doesn't match, the LLM is still called."""
+    runner = _make_runner()
+    with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock, return_value="HINT: Try again") as mock_send:
+        result = await runner._classify("여보세요", runner.script[0])
+    assert result == "Try again"
+    mock_send.assert_called_once()
+
+
 # ─── resolve_script tests ────────────────────────────────────────────
 
 def _make_scenario(num_steps=2) -> Scenario:

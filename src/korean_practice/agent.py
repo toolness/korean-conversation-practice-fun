@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -22,6 +23,11 @@ from korean_practice.scenarios import STT_CHARITY_ADDENDUM, Scenario, ScriptStep
 
 log = logging.getLogger(__name__)
 _log_prompts = os.environ.get("LOG_PROMPTS") is not None
+
+
+def strip_to_hangul(text: str) -> str:
+    """Keep only Korean syllable blocks (U+AC00-U+D7A3), removing all else."""
+    return re.sub(r'[^\uac00-\ud7a3]', '', text)
 
 # ─── Long-lived Claude Code CLI process ────────────────────────────────
 _CLIENT_OPTS = ClaudeAgentOptions(
@@ -176,6 +182,11 @@ class ScriptRunner:
 
         Returns "MATCH" or a hint string.
         """
+        # Cheap exact match: compare hangul-only characters
+        if strip_to_hangul(utterance) == strip_to_hangul(step.resolved_text):
+            log.info("_classify: cheap match (hangul-only) — skipping LLM")
+            return "MATCH"
+
         history_str = ""
         if self.history:
             lines = []
@@ -213,6 +224,7 @@ OFF: <your redirect>"""
             result_text = await _send_prompt(prompt, "_classify")
 
             if result_text.startswith("MATCH"):
+                log.info("_classify: LLM match")
                 return "MATCH"
             elif result_text.startswith("HINT:"):
                 return result_text[5:].strip()
