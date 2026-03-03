@@ -372,3 +372,61 @@ async def test_send_prompt_populates_cache():
     result = await agent._send_prompt("new prompt", "test")
     assert result == "fresh response"
     assert agent._cache_get("new prompt") == "fresh response"
+
+
+# ─── easy mode tests ─────────────────────────────────────────────────
+
+def _make_easy_runner(easy_mode=True):
+    scenario = MagicMock(spec=Scenario)
+    scenario.learner_speaker.return_value = "A"
+    script = [
+        ScriptStep(speaker="B", description="partner greets", resolved_text="여보세요"),
+        ScriptStep(speaker="A", description="learner responds", resolved_text="안녕하세요"),
+        ScriptStep(speaker="B", description="partner asks", resolved_text="누구세요?"),
+        ScriptStep(speaker="A", description="learner answers", resolved_text="저는 재민이에요"),
+    ]
+    return agent.ScriptRunner(scenario, script, easy_mode=easy_mode)
+
+
+async def test_handle_start_emits_expect_in_easy_mode():
+    runner = _make_easy_runner(easy_mode=True)
+    events = [e async for e in runner.handle_start()]
+    types = [e.type for e in events]
+    assert "expect" in types
+    expect_event = next(e for e in events if e.type == "expect")
+    assert expect_event.text == "안녕하세요"
+
+
+async def test_handle_start_no_expect_without_easy_mode():
+    runner = _make_easy_runner(easy_mode=False)
+    events = [e async for e in runner.handle_start()]
+    types = [e.type for e in events]
+    assert "expect" not in types
+
+
+async def test_handle_input_emits_expect_after_match_in_easy_mode():
+    runner = _make_easy_runner(easy_mode=True)
+    # Advance past the first partner step
+    _ = [e async for e in runner.handle_start()]
+    # Now learner says step 1 (안녕하세요) — should match and emit expect for step 3
+    with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock, return_value="MATCH"):
+        events = [e async for e in runner.handle_input("안녕하세요")]
+    types = [e.type for e in events]
+    assert "expect" in types
+    expect_event = next(e for e in events if e.type == "expect")
+    assert expect_event.text == "저는 재민이에요"
+
+
+async def test_handle_input_no_expect_on_completion():
+    """No expect event when the conversation is complete."""
+    scenario = MagicMock(spec=Scenario)
+    scenario.learner_speaker.return_value = "A"
+    script = [
+        ScriptStep(speaker="A", description="greet", resolved_text="안녕하세요"),
+    ]
+    runner = agent.ScriptRunner(scenario, script, easy_mode=True)
+    with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock, return_value="MATCH"):
+        events = [e async for e in runner.handle_input("안녕하세요")]
+    types = [e.type for e in events]
+    assert "complete" in types
+    assert "expect" not in types

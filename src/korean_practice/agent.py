@@ -147,7 +147,7 @@ async def _send_prompt(prompt: str, label: str) -> str:
 
 @dataclass
 class AgentEvent:
-    type: str  # "speak", "correct", "complete", "done"
+    type: str  # "speak", "correct", "complete", "done", "expect"
     text: str = ""
     hint: str = ""
 
@@ -155,12 +155,13 @@ class AgentEvent:
 class ScriptRunner:
     """Runs a scripted conversation, using AI only for resolution and classification."""
 
-    def __init__(self, scenario: Scenario, script: list[ScriptStep]):
+    def __init__(self, scenario: Scenario, script: list[ScriptStep], easy_mode: bool = False):
         self.scenario = scenario
         self.script = script
         self.step_index = 0
         self.learner_speaker = scenario.learner_speaker()
         self.history: list[tuple[str, str]] = []  # (speaker_label, text) pairs
+        self.easy_mode = easy_mode
 
     @property
     def current_step(self) -> ScriptStep | None:
@@ -179,6 +180,9 @@ class ScriptRunner:
         """Handle [START] trigger — emit any leading partner steps."""
         async for event in self._emit_partner_steps():
             yield event
+        expect = self._maybe_expect_event()
+        if expect:
+            yield expect
         yield AgentEvent(type="done")
 
     async def handle_input(self, text: str):
@@ -203,6 +207,10 @@ class ScriptRunner:
                 yield event
             if self.is_complete:
                 yield AgentEvent(type="complete")
+            else:
+                expect = self._maybe_expect_event()
+                if expect:
+                    yield expect
         else:
             # result is a hint string
             yield AgentEvent(type="correct", hint=result)
@@ -216,6 +224,12 @@ class ScriptRunner:
             yield AgentEvent(type="speak", text=step.resolved_text)
             self.history.append((step.speaker, step.resolved_text))
             self.step_index += 1
+
+    def _maybe_expect_event(self) -> AgentEvent | None:
+        """If in easy mode and next step is a learner step, return an expect event."""
+        if self.easy_mode and self.current_step and self._is_learner_step(self.current_step):
+            return AgentEvent(type="expect", text=self.current_step.resolved_text)
+        return None
 
     async def _classify(self, utterance: str, step: ScriptStep) -> str:
         """Use AI to classify whether utterance matches the expected step.
@@ -364,11 +378,11 @@ class ConversationManager:
     def __init__(self):
         self._runners: dict[str, ScriptRunner] = {}
 
-    async def start(self, scenario: Scenario) -> str:
+    async def start(self, scenario: Scenario, easy_mode: bool = False) -> str:
         """Start a new conversation session. Returns session ID."""
         t0 = time.monotonic()
         script = await resolve_script(scenario)
-        runner = ScriptRunner(scenario, script)
+        runner = ScriptRunner(scenario, script, easy_mode=easy_mode)
 
         sid = uuid.uuid4().hex[:12]
         self._runners[sid] = runner

@@ -6,6 +6,7 @@ import { downsample, encodeWAV, parseHash } from './utils.js';
 const html = htm.bind(h);
 
 const DEV_MODE = new URLSearchParams(location.search).has('dev');
+const EASY_MODE = new URLSearchParams(location.search).has('easy');
 
 // ─── TTS ───────────────────────────────────────────────────────────────
 const VOICE_PRIORITY = [
@@ -74,11 +75,13 @@ async function startScenario(id) {
   return res.json();
 }
 
-async function sendChat(text, sessionId, signal, onEvent) {
+async function sendChat(text, sessionId, signal, onEvent, easyMode) {
+  const body = { text, session_id: sessionId };
+  if (easyMode) body.easy_mode = true;
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, session_id: sessionId }),
+    body: JSON.stringify(body),
     signal,
   });
   const reader = res.body.getReader();
@@ -157,6 +160,7 @@ function Conversation({ briefing, onEnd }) {
   const [sending, setSending] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [pttState, setPttState] = useState('idle');
+  const [expectedText, setExpectedText] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [awaitingStart, setAwaitingStart] = useState(!!briefing.auto_start);
   const awaitingStartRef = useRef(!!briefing.auto_start);
@@ -351,6 +355,7 @@ function Conversation({ briefing, onEnd }) {
         if (event.type === 'session_id') {
           setSessionId(event.session_id);
         } else if (event.type === 'speak') {
+          setExpectedText(null);
           setMessages(prev => [...prev, { role: 'partner', text: event.text }]);
           if (awaitingStartRef.current) {
             pendingTTSRef.current.push(event.text);
@@ -359,10 +364,13 @@ function Conversation({ briefing, onEnd }) {
           }
         } else if (event.type === 'correct') {
           addHintToLastLearner(event.hint);
+        } else if (event.type === 'expect') {
+          setExpectedText(event.text);
         } else if (event.type === 'complete') {
+          setExpectedText(null);
           setCompleted(true);
         }
-      });
+      }, EASY_MODE);
     } catch (err) {
       if (err.name === 'AbortError') return;
       console.error('Chat error:', err);
@@ -445,6 +453,12 @@ function Conversation({ briefing, onEnd }) {
       </div>
 
       <div class="conv-footer">
+        ${EASY_MODE && expectedText && html`
+          <div style="background: var(--bg-alt, #f0f4f8); border: 1px solid var(--border, #ddd); border-radius: 0.5rem; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;">
+            <div class="wireframe-label">Say this:</div>
+            <div style="font-size: 1.3rem; text-align: center; padding: 0.25rem 0; font-weight: 500;">${expectedText}</div>
+          </div>
+        `}
         ${completed && !briefing.scratchpad ? html`
           <div style="text-align: center; padding: 1rem 0;">
             <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">Conversation complete!</div>

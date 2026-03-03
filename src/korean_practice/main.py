@@ -56,6 +56,7 @@ async def chat(request: Request):
     body = await request.json()
     text = body.get("text", "")
     session_id = body.get("session_id")
+    easy_mode = body.get("easy_mode", False)
 
     log.info("chat request: session_id=%r text=%s", session_id, text[:50])
 
@@ -67,7 +68,7 @@ async def chat(request: Request):
             return StreamingResponse(empty(), media_type="text/event-stream")
         scenario_id = list(_active_scenarios.keys())[-1]
         scenario = _active_scenarios[scenario_id]
-        session_id = await conversation_manager.start(scenario)
+        session_id = await conversation_manager.start(scenario, easy_mode=easy_mode)
 
     async def generate():
         yield f"data: {json.dumps({'type': 'session_id', 'session_id': session_id})}\n\n"
@@ -76,6 +77,8 @@ async def chat(request: Request):
                 yield f"data: {json.dumps({'type': 'speak', 'text': event.text})}\n\n"
             elif event.type == "correct":
                 yield f"data: {json.dumps({'type': 'correct', 'hint': event.hint})}\n\n"
+            elif event.type == "expect":
+                yield f"data: {json.dumps({'type': 'expect', 'text': event.text})}\n\n"
             elif event.type == "complete":
                 yield f'data: {{"type": "complete"}}\n\n'
             elif event.type == "done":
