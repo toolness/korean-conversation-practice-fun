@@ -543,6 +543,19 @@ function App() {
   const [loading, setLoading] = useState(!!initial.scenarioId);
   const [easyMode, setEasyMode] = useState(_EASY_MODE_INIT);
 
+  function toggleEasyMode() {
+    setEasyMode(prev => {
+      const next = !prev;
+      const params = new URLSearchParams(location.search);
+      if (next) params.set('easy', '');
+      else params.delete('easy');
+      // Strip trailing = from flag-style params (e.g. "dev=&easy=" → "dev&easy")
+      const qs = params.toString().replace(/=(?=&|$)/g, '');
+      history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+      return next;
+    });
+  }
+
   // On first load, if URL has a scenario, fetch its briefing
   useEffect(() => {
     if (initial.scenarioId) {
@@ -588,7 +601,7 @@ function App() {
   let content;
   switch (screen) {
     case 'select':
-      content = html`<${ScenarioSelect} onSelect=${handleSelect} easyMode=${easyMode} onToggleEasy=${() => setEasyMode(e => !e)} />`;
+      content = html`<${ScenarioSelect} onSelect=${handleSelect} easyMode=${easyMode} onToggleEasy=${toggleEasyMode} />`;
       break;
     case 'conversation':
       content = html`<${Conversation} briefing=${briefing} onEnd=${handleBack} easyMode=${easyMode} />`;
