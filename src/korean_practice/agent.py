@@ -20,6 +20,7 @@ from claude_agent_sdk import (
 from korean_practice.scenarios import STT_CHARITY_ADDENDUM, Scenario, ScriptStep
 
 log = logging.getLogger(__name__)
+_log_prompts = os.environ.get("LOG_PROMPTS") is not None
 
 # ─── Long-lived Claude Code CLI process ────────────────────────────────
 _client: ClaudeSDKClient | None = None
@@ -164,6 +165,8 @@ OFF: <your redirect>"""
         try:
             t0 = time.monotonic()
             log.info("_classify: sending prompt (%d chars)", len(prompt))
+            if _log_prompts:
+                log.info("_classify prompt:\n%s", prompt)
             await _client.query(prompt, session_id=uuid.uuid4().hex)
             result_text = ""
             first_token = None
@@ -242,6 +245,8 @@ Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네,
     try:
         t0 = time.monotonic()
         log.info("resolve_script: sending prompt (%d chars, %d steps)", len(prompt), len(script))
+        if _log_prompts:
+            log.info("resolve_script prompt:\n%s", prompt)
         await _client.query(prompt, session_id=uuid.uuid4().hex)
         result_text = ""
         first_token = None
