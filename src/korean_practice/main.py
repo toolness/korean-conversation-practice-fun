@@ -48,7 +48,9 @@ async def start_scenario(scenario_id: str):
     scenario = get_scenario(scenario_id)
     # Store the scenario so /api/chat can use it for first message
     _active_scenarios[scenario_id] = scenario
-    return scenario.briefing()
+    b = scenario.briefing()
+    b["id"] = scenario_id  # use registry key, not base class id
+    return b
 
 
 @app.post("/api/chat")
@@ -56,18 +58,25 @@ async def chat(request: Request):
     body = await request.json()
     text = body.get("text", "")
     session_id = body.get("session_id")
+    scenario_id = body.get("scenario_id")
     easy_mode = body.get("easy_mode", False)
 
-    log.info("chat request: session_id=%r text=%s", session_id, text[:50])
+    log.info("chat request: session_id=%r scenario_id=%r text=%s", session_id, scenario_id, text[:50])
 
-    # If no session exists, start a new one with the most recently started scenario
+    # If no session exists, start a new one
     if not session_id:
-        if not _active_scenarios:
+        # Prefer the already-setup scenario from _active_scenarios (matches briefing context)
+        if scenario_id and scenario_id in _active_scenarios:
+            scenario = _active_scenarios[scenario_id]
+        elif scenario_id:
+            scenario = get_scenario(scenario_id)
+        elif _active_scenarios:
+            scenario_id = list(_active_scenarios.keys())[-1]
+            scenario = _active_scenarios[scenario_id]
+        else:
             async def empty():
                 yield 'data: {"type": "done"}\n\n'
             return StreamingResponse(empty(), media_type="text/event-stream")
-        scenario_id = list(_active_scenarios.keys())[-1]
-        scenario = _active_scenarios[scenario_id]
         session_id = await conversation_manager.start(scenario, easy_mode=easy_mode)
 
     async def generate():

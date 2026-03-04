@@ -75,8 +75,9 @@ async function startScenario(id) {
   return res.json();
 }
 
-async function sendChat(text, sessionId, signal, onEvent, easyMode) {
+async function sendChat(text, sessionId, scenarioId, signal, onEvent, easyMode) {
   const body = { text, session_id: sessionId };
+  if (scenarioId) body.scenario_id = scenarioId;
   if (easyMode) body.easy_mode = true;
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -218,8 +219,9 @@ function Conversation({ briefing, onEnd, easyMode, onToggleEasy }) {
   }, [pttState, sending, sessionId]);
 
   // Auto-start: trigger agent to speak first for agent-initiated roles
+  // Also send [START] in easy mode to get the initial expected text
   useEffect(() => {
-    if (briefing.auto_start) {
+    if (briefing.auto_start || easyMode) {
       handleSend('[START]');
     }
   }, []);
@@ -361,7 +363,7 @@ function Conversation({ briefing, onEnd, easyMode, onToggleEasy }) {
     }
 
     try {
-      await sendChat(userText, sessionId, controller.signal, (event) => {
+      await sendChat(userText, sessionId, briefing.id, controller.signal, (event) => {
         if (event.type === 'session_id') {
           setSessionId(event.session_id);
         } else if (event.type === 'speak') {
