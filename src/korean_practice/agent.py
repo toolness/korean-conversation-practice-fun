@@ -55,6 +55,12 @@ def _cache_put(prompt: str, response: str) -> None:
     _cache_path(prompt).write_text(response)
 
 
+def _cache_delete(prompt: str) -> None:
+    """Remove a cached response (e.g. if it turned out to be malformed)."""
+    path = _cache_path(prompt)
+    path.unlink(missing_ok=True)
+
+
 # ─── Long-lived Claude Code CLI process ────────────────────────────────
 _CLIENT_OPTS = ClaudeAgentOptions(
     model="claude-sonnet-4-6",
@@ -369,6 +375,7 @@ Example response format: ["여보세요. 거기 유나 씨 집이지요?", "네,
 
     except Exception as e:
         log.error("Script resolution failed: %s", e)
+        _cache_delete(prompt)  # evict bad cached response so retries hit LLM fresh
         raise
 
 

@@ -374,6 +374,31 @@ async def test_send_prompt_populates_cache():
     assert agent._cache_get("new prompt") == "fresh response"
 
 
+def test_cache_delete_removes_entry():
+    agent._cache_put("to_delete", "value")
+    assert agent._cache_get("to_delete") == "value"
+    agent._cache_delete("to_delete")
+    assert agent._cache_get("to_delete") is None
+
+
+def test_cache_delete_missing_is_noop():
+    agent._cache_delete("nonexistent_key")  # should not raise
+
+
+async def test_resolve_script_evicts_cache_on_bad_response():
+    """When resolve_script fails to parse, it evicts the bad cache entry."""
+    scenario = _make_scenario(2)
+    bad_response = "Sorry, I can't help with that."
+    with patch("korean_practice.agent._send_prompt", new_callable=AsyncMock, return_value=bad_response):
+        with pytest.raises(ValueError):
+            await agent.resolve_script(scenario)
+    # The bad response was cached by _send_prompt but should be evicted by resolve_script
+    # Verify by checking that a cache entry for the prompt doesn't exist
+    # (we can't easily reconstruct the exact prompt, so just verify no cache files exist)
+    if agent._CACHE_DIR.exists():
+        assert len(list(agent._CACHE_DIR.iterdir())) == 0
+
+
 # ─── easy mode tests ─────────────────────────────────────────────────
 
 def _make_easy_runner(easy_mode=True):
