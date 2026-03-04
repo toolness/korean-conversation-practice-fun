@@ -143,7 +143,7 @@ function ScenarioSelect({ onSelect, easyMode, onToggleEasy }) {
         <div key=${unit}>
           <div class="wireframe-label">Unit ${unit}</div>
           ${items.map(s => html`
-            <div class="scenario-card" key=${s.id} onClick=${() => onSelect(s.id)}>
+            <div class="scenario-card" key=${s.id} tabindex="0" role="button" onClick=${() => onSelect(s.id)} onKeyDown=${e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect(s.id))}>
               <span class="unit-badge">U${s.unit}</span> ${s.title}
               <div class="grammar-tags">Grammar: ${s.grammar.join(', ')}</div>
             </div>
