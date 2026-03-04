@@ -573,7 +573,11 @@ function App() {
       setScreen(s);
       setScenarioId(sid);
       if (sid && (!briefing || briefing.id !== sid)) {
-        startScenario(sid).then(b => setBriefing(b));
+        setLoading(true);
+        startScenario(sid).then(b => {
+          setBriefing(b);
+          setLoading(false);
+        });
       }
       if (!sid) setBriefing(null);
     }
