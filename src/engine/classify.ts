@@ -4,11 +4,12 @@ import type { ScriptStep } from "../scenarios/index";
 import { buildClassifyPrompt } from "./prompts";
 import { stripToHangul } from "../utils/hangul";
 
-async function callLLM(prompt: string): Promise<string> {
+async function callLLM(prompt: string, signal?: AbortSignal): Promise<string> {
   const res = await fetch("/api/llm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt }),
+    signal,
   });
   if (!res.ok) throw new Error(`LLM request failed: ${res.status}`);
   const data = await res.json();
@@ -23,7 +24,8 @@ export async function classify(
   utterance: string,
   step: ScriptStep,
   history: Array<{ speaker: string; text: string }>,
-  learnerSpeaker: string
+  learnerSpeaker: string,
+  signal?: AbortSignal
 ): Promise<string> {
   // Cheap exact match: compare hangul-only characters
   if (stripToHangul(utterance) === stripToHangul(step.resolved_text)) {
@@ -33,7 +35,7 @@ export async function classify(
   const prompt = buildClassifyPrompt(utterance, step, history, learnerSpeaker);
 
   try {
-    const resultText = await callLLM(prompt);
+    const resultText = await callLLM(prompt, signal);
 
     if (resultText.startsWith("MATCH")) return "MATCH";
     if (resultText.startsWith("HINT:")) return resultText.slice(5).trim();
@@ -42,6 +44,7 @@ export async function classify(
     console.warn("Unexpected classification response:", resultText.slice(0, 100));
     return "Try again — say something closer to the expected response.";
   } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
     console.error("Classification error:", err);
     return "Sorry, there was an error. Please try again.";
   }

@@ -58,6 +58,7 @@ export function Conversation({
     chunks: Float32Array[];
   } | null>(null);
   const runnerRef = useRef<ScriptRunner | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Initialize: resolve script and create runner
   useEffect(() => {
@@ -95,23 +96,28 @@ export function Conversation({
 
   async function processEvents(gen: AsyncGenerator<AgentEvent>) {
     setSending(true);
-    for await (const event of gen) {
-      if (event.type === "speak") {
-        setExpectedText(null);
-        setMessages((prev) => [...prev, { role: "partner", text: event.text! }]);
-        if (awaitingStartRef.current) {
-          pendingTTSRef.current.push(event.text!);
-        } else {
-          speak(event.text!, DEV_MODE);
+    try {
+      for await (const event of gen) {
+        if (event.type === "speak") {
+          setExpectedText(null);
+          setMessages((prev) => [...prev, { role: "partner", text: event.text! }]);
+          if (awaitingStartRef.current) {
+            pendingTTSRef.current.push(event.text!);
+          } else {
+            speak(event.text!, DEV_MODE);
+          }
+        } else if (event.type === "correct") {
+          addHintToLastLearner(event.hint!);
+        } else if (event.type === "expect") {
+          setExpectedText(event.text!);
+        } else if (event.type === "complete") {
+          setExpectedText(null);
+          setCompleted(true);
         }
-      } else if (event.type === "correct") {
-        addHintToLastLearner(event.hint!);
-      } else if (event.type === "expect") {
-        setExpectedText(event.text!);
-      } else if (event.type === "complete") {
-        setExpectedText(null);
-        setCompleted(true);
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      throw err;
     }
     setSending(false);
   }
@@ -127,7 +133,7 @@ export function Conversation({
       if (e.repeat) return;
       if (e.key === "Escape" && sending) {
         e.preventDefault();
-        // Cancel not applicable in frontend-driven model
+        cancelSend();
       } else if (
         e.key === " " &&
         awaitingStartRef.current &&
@@ -271,6 +277,21 @@ export function Conversation({
     });
   }
 
+  function cancelSend() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    // Remove the last learner message (the one we just added)
+    setMessages((prev) => {
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].role === "learner") {
+          return [...prev.slice(0, i), ...prev.slice(i + 1)];
+        }
+      }
+      return prev;
+    });
+    setSending(false);
+  }
+
   async function handleSend(text: string) {
     if (!text.trim() || sending || !runnerRef.current) return;
     const userText = text.trim();
@@ -282,8 +303,11 @@ export function Conversation({
       return;
     }
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     setMessages((prev) => [...prev, { role: "learner", text: userText, hints: [] }]);
-    await processEvents(runnerRef.current.handleInput(userText));
+    await processEvents(runnerRef.current.handleInput(userText, controller.signal));
+    abortRef.current = null;
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -396,7 +420,8 @@ export function Conversation({
               padding: "0.25rem 0.5rem",
             }}
           >
-            Thinking...
+            Thinking...{" "}
+            <span style={{ fontSize: "0.7rem" }}>(Esc to cancel)</span>
           </div>
         )}
         <div ref={chatEndRef}></div>

@@ -160,5 +160,38 @@ describe("ScriptRunner", () => {
       const events = await collectEvents(runner.handleInput("more"));
       expect(events.map((e) => e.type)).toEqual(["done"]);
     });
+
+    it("rejects with AbortError when signal is already aborted", async () => {
+      const runner = makeRunner();
+      await collectEvents(runner.handleStart());
+
+      // classify won't match hangul exactly, so it'll call the mock which throws
+      mockClassify.mockImplementation(() => {
+        throw new DOMException("Aborted", "AbortError");
+      });
+
+      await expect(
+        collectEvents(runner.handleInput("다른 말", AbortSignal.abort()))
+      ).rejects.toThrow("Aborted");
+      // stepIndex should not have advanced
+      expect(runner.stepIndex).toBe(1);
+    });
+
+    it("propagates abort when signal fires mid-classify", async () => {
+      const runner = makeRunner();
+      await collectEvents(runner.handleStart());
+
+      const controller = new AbortController();
+      // Make classify hang, then abort
+      mockClassify.mockImplementation(() => {
+        controller.abort();
+        throw new DOMException("Aborted", "AbortError");
+      });
+
+      await expect(
+        collectEvents(runner.handleInput("다른 말", controller.signal))
+      ).rejects.toThrow("Aborted");
+      expect(runner.stepIndex).toBe(1);
+    });
   });
 });

@@ -45,7 +45,7 @@ export class ScriptRunner {
   }
 
   /** Handle learner input — classify, advance, emit partner steps. */
-  async *handleInput(text: string): AsyncGenerator<AgentEvent> {
+  async *handleInput(text: string, signal?: AbortSignal): AsyncGenerator<AgentEvent> {
     const step = this.currentStep;
     if (!step) {
       yield { type: "done" };
@@ -58,7 +58,7 @@ export class ScriptRunner {
       return;
     }
 
-    const result = await classify(text, step, this.history, this.learnerSpeaker);
+    const result = await classify(text, step, this.history, this.learnerSpeaker, signal);
 
     if (result === "MATCH") {
       this.history.push({ speaker: step.speaker, text });
