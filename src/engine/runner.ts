@@ -88,7 +88,7 @@ export class ScriptRunner {
   }
 
   /** If in easy mode and next step is a learner step, return an expect event. */
-  private maybeExpectEvent(): AgentEvent | null {
+  maybeExpectEvent(): AgentEvent | null {
     if (this.easyMode && this.currentStep && this.isLearnerStep(this.currentStep)) {
       return { type: "expect", text: this.currentStep.resolved_text };
     }

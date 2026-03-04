@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import type { Briefing } from "../scenarios/index";
+import type { Briefing, Scenario } from "../scenarios/index";
 import type { AgentEvent } from "../engine/runner";
 import { ScriptRunner } from "../engine/runner";
 import { resolveScript } from "../engine/resolve";
-import { getScenario } from "../scenarios/index";
 import { EasyModeToggle } from "./easy-mode-toggle";
 import { speak, replay, getVoiceName } from "../utils/tts";
 import { downsample, encodeWAV } from "../utils/audio";
@@ -17,7 +16,7 @@ interface Message {
 }
 
 interface Props {
-  scenarioId: string;
+  scenario: Scenario;
   briefing: Briefing;
   onEnd: () => void;
   easyMode: boolean;
@@ -34,7 +33,7 @@ async function transcribeAudio(blob: Blob, prompt?: string): Promise<string> {
 }
 
 export function Conversation({
-  scenarioId,
+  scenario,
   briefing,
   onEnd,
   easyMode,
@@ -65,8 +64,6 @@ export function Conversation({
     let cancelled = false;
 
     async function init() {
-      const scenario = getScenario(scenarioId);
-      // Override context from briefing (the briefing was already setup with randomized context)
       const script = await resolveScript(scenario);
       if (cancelled) return;
       const runner = new ScriptRunner(scenario, script, easyMode);
@@ -81,7 +78,20 @@ export function Conversation({
 
     init().catch(console.error);
     return () => { cancelled = true; };
-  }, [scenarioId]);
+  }, [scenario]);
+
+  // Sync easyMode changes to the runner mid-conversation
+  useEffect(() => {
+    const runner = runnerRef.current;
+    if (!runner) return;
+    runner.easyMode = easyMode;
+    if (easyMode) {
+      const expect = runner.maybeExpectEvent();
+      if (expect) setExpectedText(expect.text!);
+    } else {
+      setExpectedText(null);
+    }
+  }, [easyMode]);
 
   async function processEvents(gen: AsyncGenerator<AgentEvent>) {
     setSending(true);
@@ -118,6 +128,14 @@ export function Conversation({
       if (e.key === "Escape" && sending) {
         e.preventDefault();
         // Cancel not applicable in frontend-driven model
+      } else if (
+        e.key === " " &&
+        awaitingStartRef.current &&
+        !sending &&
+        !loading
+      ) {
+        e.preventDefault();
+        handleAutoStart();
       } else if (
         !DEV_MODE &&
         e.key === " " &&
@@ -287,10 +305,6 @@ export function Conversation({
       : pttState === "processing"
         ? "ptt-processing"
         : "ptt-idle";
-
-  if (loading) {
-    return <p style={{ textAlign: "center", padding: "2rem 0", color: "var(--muted)" }}>Loading conversation...</p>;
-  }
 
   return (
     <div className="conv-layout">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ScenarioSelect } from "./components/scenario-select";
 import { Conversation } from "./components/conversation";
-import { getScenario, type Briefing } from "./scenarios/index";
+import { getScenario, type Briefing, type Scenario } from "./scenarios/index";
 import { parseHash, navigate } from "./utils/routing";
 
 const EASY_MODE_INIT =
@@ -11,6 +11,7 @@ export function App() {
   const initial = parseHash(location.hash);
   const [screen, setScreen] = useState(initial.screen);
   const [scenarioId, setScenarioId] = useState<string | null>(initial.scenarioId);
+  const [scenario, setScenario] = useState<Scenario | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(!!initial.scenarioId);
   const [easyMode, setEasyMode] = useState(EASY_MODE_INIT);
@@ -31,16 +32,18 @@ export function App() {
     });
   }
 
-  function loadScenario(id: string) {
-    const scenario = getScenario(id);
-    return scenario.briefing();
+  function loadScenario(id: string): { scenario: Scenario; briefing: Briefing } {
+    const s = getScenario(id);
+    const b = s.briefing();
+    b.id = id;
+    return { scenario: s, briefing: b };
   }
 
   // On first load, if URL has a scenario, get its briefing
   useEffect(() => {
     if (initial.scenarioId) {
-      const b = loadScenario(initial.scenarioId);
-      b.id = initial.scenarioId; // use registry key
+      const { scenario: s, briefing: b } = loadScenario(initial.scenarioId);
+      setScenario(s);
       setBriefing(b);
       setLoading(false);
     }
@@ -49,23 +52,26 @@ export function App() {
   // Listen for back/forward navigation
   useEffect(() => {
     function onPopState() {
-      const { screen: s, scenarioId: sid } = parseHash(location.hash);
-      setScreen(s);
+      const { screen: scr, scenarioId: sid } = parseHash(location.hash);
+      setScreen(scr);
       setScenarioId(sid);
       if (sid && (!briefing || briefing.id !== sid)) {
-        const b = loadScenario(sid);
-        b.id = sid;
+        const { scenario: s, briefing: b } = loadScenario(sid);
+        setScenario(s);
         setBriefing(b);
       }
-      if (!sid) setBriefing(null);
+      if (!sid) {
+        setScenario(null);
+        setBriefing(null);
+      }
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [briefing]);
 
   function handleSelect(id: string) {
-    const b = loadScenario(id);
-    b.id = id;
+    const { scenario: s, briefing: b } = loadScenario(id);
+    setScenario(s);
     setBriefing(b);
     setScenarioId(id);
     setScreen("conversation");
@@ -74,6 +80,7 @@ export function App() {
 
   function handleBack() {
     setScreen("select");
+    setScenario(null);
     setBriefing(null);
     setScenarioId(null);
     navigate("select");
@@ -81,11 +88,11 @@ export function App() {
 
   if (loading) return <p>Loading...</p>;
 
-  if (screen === "conversation" && briefing && scenarioId) {
+  if (screen === "conversation" && briefing && scenario && scenarioId) {
     return (
       <Conversation
         key={scenarioId}
-        scenarioId={scenarioId}
+        scenario={scenario}
         briefing={briefing}
         onEnd={handleBack}
         easyMode={easyMode}
