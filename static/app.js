@@ -114,6 +114,15 @@ async function transcribeAudio(blob, prompt) {
 // downsample and encodeWAV are in utils.js
 
 // ─── Scenario Select Screen ───────────────────────────────────────────
+function EasyModeToggle({ easyMode, onToggle }) {
+  return html`
+    <label class="easy-mode-toggle">
+      <input type="checkbox" checked=${easyMode} onChange=${onToggle} />
+      Easy mode <span style="color: var(--muted); font-size: 0.8rem;">— shows what to say next</span>
+    </label>
+  `;
+}
+
 function ScenarioSelect({ onSelect, easyMode, onToggleEasy }) {
   const [scenarios, setScenarios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -135,10 +144,7 @@ function ScenarioSelect({ onSelect, easyMode, onToggleEasy }) {
     <div>
       <h1>Korean Conversation Practice</h1>
       <p class="subtitle">Choose a scenario to practice</p>
-      <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; font-size: 0.9rem;">
-        <input type="checkbox" checked=${easyMode} onChange=${onToggleEasy} />
-        Easy mode <span style="color: var(--muted); font-size: 0.8rem;">— shows what to say next</span>
-      </label>
+      <${EasyModeToggle} easyMode=${easyMode} onToggle=${onToggleEasy} />
       ${Object.entries(byUnit).map(([unit, items]) => html`
         <div key=${unit}>
           <div class="wireframe-label">Unit ${unit}</div>
@@ -156,7 +162,7 @@ function ScenarioSelect({ onSelect, easyMode, onToggleEasy }) {
 
 
 // ─── Conversation Screen ──────────────────────────────────────────────
-function Conversation({ briefing, onEnd, easyMode }) {
+function Conversation({ briefing, onEnd, easyMode, onToggleEasy }) {
   // Messages: { role, text, hints? }
   // Hints are attached to the learner message they pertain to
   const [messages, setMessages] = useState([]);
@@ -405,6 +411,7 @@ function Conversation({ briefing, onEnd, easyMode }) {
           <h2 style="margin: 0; border: none; padding: 0; font-size: 1.1rem;">${briefing.title}</h2>
           <button class="btn btn-outline" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;" onClick=${onEnd}>End</button>
         </div>
+        <${EasyModeToggle} easyMode=${easyMode} onToggle=${onToggleEasy} />
         ${!briefing.scratchpad && html`
           <div class="context-bar">
             <strong>${briefing.context.role}</strong> — ${briefing.context.detail}
@@ -608,7 +615,7 @@ function App() {
       content = html`<${ScenarioSelect} onSelect=${handleSelect} easyMode=${easyMode} onToggleEasy=${toggleEasyMode} />`;
       break;
     case 'conversation':
-      content = html`<${Conversation} briefing=${briefing} onEnd=${handleBack} easyMode=${easyMode} />`;
+      content = html`<${Conversation} briefing=${briefing} onEnd=${handleBack} easyMode=${easyMode} onToggleEasy=${toggleEasyMode} />`;
       break;
   }
 
