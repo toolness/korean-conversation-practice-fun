@@ -4,7 +4,8 @@ A local web app for practicing Korean conversations tied to the [Active Korean](
 
 ## How it works
 
-- **Backend**: FastAPI serves a Preact frontend and handles API requests
+- **Frontend**: React + TypeScript, bundled with Bun. Owns all conversation state — scenarios, script runner, and prompt building all run in the browser.
+- **Backend**: Hono server on Bun. Thin proxy with two endpoints: `/api/llm` (Claude via Agent SDK) and `/api/transcribe` (whisper-cli).
 - **AI partner**: Claude (via the Claude Agent SDK) plays the conversation partner, staying within textbook grammar and vocabulary
 - **Speech-to-text**: whisper.cpp (`whisper-cli`) transcribes your Korean speech
 - **Text-to-speech**: Browser SpeechSynthesis reads the partner's responses aloud (works best with the "Yuna" Korean voice on macOS)
@@ -12,18 +13,11 @@ A local web app for practicing Korean conversations tied to the [Active Korean](
 
 ## Prerequisites
 
-### Python 3.11+
-
-```bash
-# macOS (Homebrew)
-brew install python@3.12
-```
-
-### uv (Python package manager)
+### Bun
 
 ```bash
 # macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -fsSL https://bun.sh/install | bash
 ```
 
 ### whisper.cpp (for speech-to-text)
@@ -62,29 +56,30 @@ export ANTHROPIC_API_KEY=sk-ant-...
 git clone <repo-url>
 cd korean-conversation-practice-fun
 
-# Install dependencies (creates .venv automatically)
-uv sync
+# Install dependencies
+bun install
+
+# Build frontend
+bun run build
 ```
 
 ## Running
 
 ```bash
-uv run start
+bun run start
 ```
 
-Then open http://127.0.0.1:8000 in your browser.
+Then open http://localhost:8000 in your browser.
 
 ### Options
 
 ```
-uv run start --help           # show all options
-uv run start --port 9000      # custom port
-uv run start --reload         # auto-reload on file changes
+bun run start --port 9000      # custom port
 ```
 
 ### Dev mode
 
-Open http://127.0.0.1:8000/?dev to use text input instead of voice. This is useful for:
+Open http://localhost:8000/?dev to use text input instead of voice. This is useful for:
 
 - Testing without a microphone
 - Debugging conversation flow
@@ -92,29 +87,59 @@ Open http://127.0.0.1:8000/?dev to use text input instead of voice. This is usef
 
 ## Usage
 
-1. **Select a scenario** — currently Unit 9 (phone calls)
+1. **Select a scenario** — currently Unit 9 (phone calls) + STT Scratchpad
 2. **Read the briefing** — your role, grammar points, key vocabulary
 3. **Start the conversation** — hold Space to speak, release to send
-4. Press **Escape** while recording to cancel, or while waiting for a response to retry
+4. Press **Escape** while recording to cancel
+
+## Adding new scenarios
+
+Create a new file in `src/scenarios/` following the pattern in `unit9-phone.ts`:
+
+1. Define a factory function that returns a `Scenario` object
+2. Call `register(factory)` at module level
+3. Import the module in `src/scenarios/registry.ts` (in `ensureScenariosLoaded`)
+
+Each scenario defines:
+- `id`, `unit`, `title`, `grammar` — metadata
+- `roles()` — for multi-role scenarios (e.g., caller/answerer)
+- `setup()` — randomize context
+- `conversationScript()` — sequence of `ScriptStep` objects
+- `briefing()` — context shown to the learner
 
 ## Project structure
 
 ```
-├── CLAUDE.md                          # Development notes
-├── pyproject.toml                     # Python project config
-├── src/korean_practice/
-│   ├── main.py                        # FastAPI app + server entry point
-│   ├── agent.py                       # Claude Agent SDK conversation manager
-│   ├── stt.py                         # whisper-cli wrapper
-│   └── scenarios/
-│       ├── __init__.py                # Scenario base class + registry
-│       ├── vocab.py                   # Vocabulary pools from Active Korean
-│       └── unit9_phone.py             # Unit 9: phone call scenario
-├── static/
-│   ├── index.html
-│   ├── app.js                         # Preact app (no build step)
-│   ├── style.css
-│   └── vendor/                        # Vendored Preact + htm ESM bundles
-├── active-korean-vocabulary.md        # Vocabulary reference
-└── project-brief.html                 # Original design brief
+server/
+  index.ts              — Hono server, static files, CLI
+  llm.ts                — /api/llm endpoint + Claude SDK client
+  stt.ts                — /api/transcribe endpoint + whisper-cli
+  cache.ts              — file-based LLM cache
+  mutex.ts              — async mutex for serializing LLM calls
+src/
+  index.tsx             — React entry
+  app.tsx               — Router, global state
+  components/
+    scenario-select.tsx — Scenario list with unit grouping
+    conversation.tsx    — Chat UI, message list, input handling
+    easy-mode-toggle.tsx
+  engine/
+    runner.ts           — ScriptRunner (conversation state machine)
+    resolve.ts          — resolveScript (LLM call)
+    classify.ts         — classify utterance (LLM call)
+    prompts.ts          — prompt templates
+  scenarios/
+    index.ts            — types, re-exports
+    registry.ts         — scenario registry
+    vocab.ts            — vocabulary data
+    unit9-phone.ts      — Unit 9 phone call scenario
+    scratchpad.ts       — STT scratchpad
+  utils/
+    audio.ts            — downsample, WAV encoding
+    routing.ts          — hash router
+    tts.ts              — text-to-speech
+    hangul.ts           — Korean text utilities
+public/
+  index.html
+  style.css
 ```

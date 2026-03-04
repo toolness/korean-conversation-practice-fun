@@ -1,0 +1,22 @@
+{
+  "name": "korean-conversation-practice",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "bun run server/index.ts",
+    "build": "bun run build.ts",
+    "dev": "bun run build.ts --watch & bun run server/index.ts --port 8000",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "hono": "^4"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "react": "^19",
+    "react-dom": "^19",
+    "typescript": "^5"
+  }
+}

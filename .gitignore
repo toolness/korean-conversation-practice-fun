@@ -1,11 +1,15 @@
+node_modules/
+dist/
+bun.lock
+last_utterance.wav
+.claude/
+.llm_cache/
+whisper-models/
+*.tsbuildinfo
+
+# Legacy Python (safe to remove after cleanup)
 .venv/
 __pycache__/
 *.pyc
 *.egg-info/
-dist/
-build/
-last_utterance.wav
-.claude/
-.llm_cache/
-uv.lock
-whisper-models/
+.pytest_cache/

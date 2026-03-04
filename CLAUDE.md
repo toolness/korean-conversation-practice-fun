@@ -1,11 +1,15 @@
 # Korean Conversation Practice
 
+## Architecture
+
+- **Frontend** (React + TypeScript): Owns all conversation state. Scenarios, script runner, and prompt building all live in the browser.
+- **Backend** (Hono + Bun): Thin proxy — two endpoints (`/api/llm` for Claude, `/api/transcribe` for whisper-cli). No conversation state, no sessions.
+
 ## Running the server
 
 ```
-uv run start                          # default: 127.0.0.1:8000
-uv run start --port 8001 --reload     # custom port with auto-reload
-uv run start --help                   # show all options
+bun run build && bun run start              # default: port 8000
+bun run start --port 8001                   # custom port
 ```
 
 Add `?dev` to the URL for dev mode (text input instead of voice).
@@ -15,32 +19,28 @@ Add `?dev` to the URL for dev mode (text input instead of voice).
 When testing the server (e.g. via curl or Chrome DevTools MCP), use port **8001** to avoid conflicting with the user's instance on port 8000:
 
 ```
-CLAUDECODE= uv run start --port 8001
+CLAUDECODE= bun run build && CLAUDECODE= bun run start --port 8001
 ```
 
 The `CLAUDECODE=` prefix is needed to avoid "cannot launch inside another Claude Code session" errors from the Claude Agent SDK.
 
+After making frontend changes, run `bun run build` to rebundle.
+
 ## Testing
 
-### Backend tests
-
-Always add or update backend tests when making backend changes. Tests live in `tests/` and use pytest + pytest-asyncio.
+All tests use Bun's built-in test runner:
 
 ```
-uv run pytest
+bun test
 ```
 
-Follow the patterns in `tests/test_agent.py` — mock `_send_prompt` for classify/resolve tests, mock the client for `_send_prompt` tests.
+Test locations:
+- `server/__tests__/` — backend (cache, etc.)
+- `src/engine/__tests__/` — conversation engine (runner, classify)
+- `src/scenarios/__tests__/` — scenario definitions
+- `src/utils/__tests__/` — utilities (audio, routing, hangul)
 
-### Frontend tests
-
-Pure utility functions live in `static/utils.js` and are tested with Node's built-in test runner:
-
-```
-node --test static/utils.test.js
-```
-
-When adding or changing pure logic (non-DOM, non-Preact), extract it to `utils.js` and add tests.
+When adding or changing logic, add tests. Mock `classify` for runner tests, mock `fetch` for resolve/classify tests.
 
 ### Verifying behavior with Chrome DevTools MCP
 
