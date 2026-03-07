@@ -46,6 +46,7 @@ export interface Briefing {
   start_hint?: string;
   auto_start?: boolean;
   scratchpad?: boolean;
+  picture_speaking?: boolean;
 }
 
 export interface ScenarioContext {

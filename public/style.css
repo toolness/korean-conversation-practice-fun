@@ -277,6 +277,75 @@ h2 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
   box-shadow: 0 0 0 2px var(--blue-light);
 }
 
+/* Picture speaking drill */
+.picture-grid {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 1rem 0;
+}
+.picture-card {
+  position: relative;
+  width: 8rem;
+  flex-shrink: 0;
+}
+.picture-img {
+  width: 100%;
+  height: 8rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  background: #fff;
+}
+.notion-link {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  transition: color 0.15s, background 0.15s;
+}
+.notion-link:hover {
+  color: var(--text);
+  background: #fff;
+}
+.picture-feedback {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 30rem;
+  font-size: 0.85rem;
+}
+.picture-feedback.correct {
+  background: var(--green-light);
+  border: 1px solid var(--green);
+}
+.picture-feedback.incorrect {
+  background: var(--orange-light);
+  border: 1px solid var(--orange);
+}
+.feedback-status {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.picture-feedback.correct .feedback-status { color: var(--green); }
+.picture-feedback.incorrect .feedback-status { color: var(--orange); }
+.feedback-example {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
 /* TTS log (dev mode) */
 .tts-log-container {
   margin-top: 0.75rem;

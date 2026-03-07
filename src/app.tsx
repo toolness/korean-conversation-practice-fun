@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ScenarioSelect } from "./components/scenario-select";
 import { Conversation } from "./components/conversation";
+import { PictureSpeaking } from "./components/picture-speaking";
 import { getScenario, type Briefing, type Scenario } from "./scenarios/index";
 import { parseHash, navigate } from "./utils/routing";
 
@@ -89,6 +90,15 @@ export function App() {
   if (loading) return <p>Loading...</p>;
 
   if (screen === "conversation" && briefing && scenario && scenarioId) {
+    if (briefing.picture_speaking) {
+      return (
+        <PictureSpeaking
+          key={scenarioId}
+          briefing={briefing}
+          onEnd={handleBack}
+        />
+      );
+    }
     return (
       <Conversation
         key={scenarioId}

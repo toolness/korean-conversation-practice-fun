@@ -3,6 +3,7 @@ import { join } from "path";
 import { writeFileSync } from "fs";
 import { bootClient, sendPrompt, shutdownClient } from "./llm";
 import { transcribe } from "./stt";
+import { loadVocab, vocabApp } from "./vocab";
 
 const app = new Hono();
 const DIST_DIR = join(import.meta.dir, "..", "dist");
@@ -22,6 +23,8 @@ app.post("/api/llm", async (c) => {
     return c.json({ error: "LLM request failed" }, 500);
   }
 });
+
+app.route("/api/vocab", vocabApp);
 
 app.post("/api/transcribe", async (c) => {
   const formData = await c.req.formData();
@@ -64,8 +67,9 @@ function parseArgs(): { port: number } {
 
 const { port } = parseArgs();
 
-// Boot LLM client then start server
+// Boot LLM client and load vocab data, then start server
 await bootClient();
+loadVocab();
 
 // ─── Static file serving via Bun.serve ──────────────────────────────
 
@@ -75,6 +79,9 @@ const MIME: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json",
   ".png": "image/png",
+  ".webp": "image/webp",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",

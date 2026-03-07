@@ -56,4 +56,5 @@ export function ensureScenariosLoaded(): void {
   // Dynamic requires to avoid circular initialization
   require("./unit9-phone");
   require("./scratchpad");
+  require("./picture-speaking");
 }
