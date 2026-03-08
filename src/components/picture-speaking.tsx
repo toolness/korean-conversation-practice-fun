@@ -28,6 +28,7 @@ function lastEvalCorrect(activity: Activity): boolean {
 function mapKeyDown(e: KeyboardEvent, activity: Activity): PipelineEvent | null {
   if (e.key === "Escape") {
     switch (activity.kind) {
+      case "idle": return { type: "REVIEW_NEXT" };
       case "recording": return { type: "RECORD_CANCEL" };
       case "confirming": return { type: "REJECT_TRANSCRIPT" };
       case "reviewing": return lastEvalCorrect(activity)
@@ -42,7 +43,7 @@ function mapKeyDown(e: KeyboardEvent, activity: Activity): PipelineEvent | null 
       case "confirming": return { type: "CONFIRM_TRANSCRIPT" };
       case "reviewing": return lastEvalCorrect(activity)
         ? { type: "REVIEW_NEXT" }
-        : { type: "REVIEW_RETRY" };
+        : { type: "RECORD_START" };
       default: return null;
     }
   }

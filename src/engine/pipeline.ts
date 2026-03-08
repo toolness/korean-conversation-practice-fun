@@ -116,7 +116,7 @@ export function transition(
     }
 
     case "RECORD_START": {
-      if (state.activity.kind !== "idle") return { state, effects };
+      if (state.activity.kind !== "idle" && state.activity.kind !== "reviewing") return { state, effects };
       effects.push({ type: "START_RECORDING" });
       return {
         state: { ...state, activity: { kind: "recording", session: state.activity.session } },
@@ -319,7 +319,7 @@ export function transition(
     }
 
     case "REVIEW_NEXT": {
-      if (state.activity.kind !== "reviewing") return { state, effects };
+      if (state.activity.kind !== "reviewing" && state.activity.kind !== "idle") return { state, effects };
       let nextState = { ...state };
       const nextActivity = advanceActivity(nextState, effects);
       nextState = { ...nextState, activity: nextActivity };
