@@ -1,6 +1,7 @@
 /** Pure render component for the pipeline drill. */
 
 import React, { useRef, useEffect } from "react";
+import Markdown from "react-markdown";
 import type { PipelineState, PipelineEvent, WordSession, ThreadMessage } from "../engine/pipeline-types";
 import type { Activity } from "../engine/pipeline-types";
 import { getNotionPageUrl } from "../utils/notion";
@@ -71,13 +72,13 @@ function ThreadView({ thread }: { thread: ThreadMessage[] }) {
                 <div className="feedback-status">
                   {msg.feedback.correct ? "Correct!" : "Needs work"}
                 </div>
-                <p>{msg.feedback.feedback}</p>
+                <Markdown>{msg.feedback.feedback}</Markdown>
                 {msg.feedback.example && (
                   <div className="feedback-example">
                     <span className="wireframe-label" style={{ marginTop: 0 }}>Example</span>
-                    <p style={{ fontSize: "1.1rem", margin: "0.25rem 0 0" }}>
-                      {msg.feedback.example}
-                    </p>
+                    <div style={{ fontSize: "1.1rem", margin: "0.25rem 0 0" }}>
+                      <Markdown>{msg.feedback.example}</Markdown>
+                    </div>
                   </div>
                 )}
               </div>
@@ -93,7 +94,7 @@ function ThreadView({ thread }: { thread: ThreadMessage[] }) {
             return (
               <div key={i} className="chat-bubble partner" style={{ display: "inline-block" }}>
                 <div className="speaker">Tutor</div>
-                {msg.text}
+                <Markdown>{msg.text}</Markdown>
               </div>
             );
         }

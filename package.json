@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest",
-    "hono": "^4"
+    "hono": "^4",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/react": "^19",
