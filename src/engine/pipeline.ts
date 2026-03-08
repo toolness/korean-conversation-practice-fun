@@ -171,7 +171,7 @@ export function transition(
         companionFetchInFlight: false,
       };
       // If loading (waiting for words) and we got groups, go idle with first group
-      if (nextState.activity.kind === "loading" && event.groups.length > 0) {
+      if (nextState.activity.kind === "loading" && !nextState.easyMode && event.groups.length > 0) {
         const group = nextState.groupPool[0];
         nextState = {
           ...nextState,
@@ -197,6 +197,14 @@ export function transition(
         if (effects.some((e) => e.type === "FETCH_COMPANIONS")) {
           nextState = { ...nextState, companionFetchInFlight: true };
         }
+      }
+      // Advance to next word so the new mode takes effect immediately
+      if (nextState.activity.kind === "idle") {
+        const nextActivity = advanceActivity(nextState, effects);
+        nextState = { ...nextState, activity: nextActivity };
+        nextState = shiftReviewQueue(nextState);
+        nextState = shiftWordPool(nextState);
+        nextState = shiftGroupPool(nextState);
       }
       return { state: nextState, effects };
     }
