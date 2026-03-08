@@ -29,13 +29,23 @@ export async function shutdownClient(): Promise<void> {
   // No persistent client to disconnect in the new SDK
 }
 
-export async function sendPrompt(prompt: string, label: string): Promise<string> {
+export interface SendPromptOpts {
+  timeout?: number;
+  model?: string;
+}
+
+export async function sendPrompt(prompt: string, label: string, opts?: SendPromptOpts): Promise<string> {
   // Check cache before acquiring lock
   const cached = cacheGet(prompt);
   if (cached !== null) {
     console.log(`${label}: cache hit (${cached.length} chars)`);
     return cached;
   }
+
+  const timeout = opts?.timeout ?? LLM_TIMEOUT;
+  const queryOptions = opts?.model
+    ? { ...LLM_OPTIONS, model: opts.model }
+    : LLM_OPTIONS;
 
   return mutex.run(async () => {
     // Double-check cache inside lock
@@ -53,23 +63,23 @@ export async function sendPrompt(prompt: string, label: string): Promise<string>
 
     try {
       const result = await Promise.race([
-        doQuery(prompt, label, t0),
+        doQuery(prompt, label, t0, queryOptions),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("LLM timeout")), LLM_TIMEOUT)
+          setTimeout(() => reject(new Error("LLM timeout")), timeout)
         ),
       ]);
       return result;
     } catch (err) {
       if (err instanceof Error && err.message === "LLM timeout") {
-        console.error(`${label}: timed out after ${LLM_TIMEOUT / 1000}s`);
+        console.error(`${label}: timed out after ${timeout / 1000}s`);
       }
       throw err;
     }
   });
 }
 
-async function doQuery(prompt: string, label: string, t0: number): Promise<string> {
-  const stream = query({ prompt, options: LLM_OPTIONS });
+async function doQuery(prompt: string, label: string, t0: number, options: Options = LLM_OPTIONS): Promise<string> {
+  const stream = query({ prompt, options });
 
   let resultText = "";
   let firstToken: number | null = null;

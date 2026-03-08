@@ -17,6 +17,10 @@ export interface Feedback {
   raw?: string;
 }
 
+export interface WordGroup {
+  words: VocabItem[];
+}
+
 // ─── Thread Messages ────────────────────────────────────────────────
 
 export type ThreadMessage =
@@ -29,7 +33,7 @@ export type ThreadMessage =
 
 export interface WordSession {
   sessionId: string;
-  word: VocabItem;
+  words: VocabItem[];
   thread: ThreadMessage[];
 }
 
@@ -60,6 +64,9 @@ export interface PipelineState {
   reviewQueue: WordSession[];
   backgroundEvals: BackgroundEval[];
   wordPool: VocabItem[];
+  groupPool: WordGroup[];
+  companionFetchInFlight: boolean;
+  easyMode: boolean;
   nextAbortId: number;
   error: string | null;
 }
@@ -70,6 +77,9 @@ export type PipelineEvent =
   | { type: "INIT" }
   | { type: "WORDS_LOADED"; words: VocabItem[] }
   | { type: "WORDS_LOAD_FAILED"; error: string }
+  | { type: "GROUPS_LOADED"; groups: WordGroup[] }
+  | { type: "GROUPS_LOAD_FAILED"; error: string }
+  | { type: "SET_EASY_MODE"; easyMode: boolean }
   | { type: "RECORD_START" }
   | { type: "RECORD_STOP" }
   | { type: "RECORD_CANCEL" }
@@ -91,6 +101,7 @@ export type PipelineEvent =
 
 export type PipelineEffect =
   | { type: "FETCH_WORDS"; count: number }
+  | { type: "FETCH_COMPANIONS" }
   | { type: "START_RECORDING" }
   | { type: "STOP_RECORDING_AND_TRANSCRIBE"; sttHint: string }
   | { type: "CANCEL_RECORDING" }

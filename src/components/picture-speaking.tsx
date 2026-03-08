@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { Briefing } from "../scenarios/index";
 import type { PipelineState, PipelineEvent, Activity } from "../engine/pipeline-types";
 import { transition, initialState } from "../engine/pipeline";
-import { createEffectExecutor } from "./pipeline-effects";
+import { createEffectExecutor, CLIENT_GROUPS_CACHE_VERSION } from "./pipeline-effects";
 import { PipelineView } from "./pipeline-view";
 
 const DEV_MODE =
@@ -14,6 +14,8 @@ const DEV_MODE =
 interface Props {
   briefing: Briefing;
   onEnd: () => void;
+  easyMode: boolean;
+  onToggleEasy: () => void;
 }
 
 function lastEvalCorrect(activity: Activity): boolean {
@@ -57,8 +59,8 @@ function mapKeyUp(e: KeyboardEvent, activity: Activity): PipelineEvent | null {
   return null;
 }
 
-export function PictureSpeaking({ briefing, onEnd }: Props) {
-  const [state, setState] = useState<PipelineState>(initialState);
+export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy }: Props) {
+  const [state, setState] = useState<PipelineState>(() => initialState(easyMode));
   const [input, setInput] = useState("");
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -78,10 +80,30 @@ export function PictureSpeaking({ briefing, onEnd }: Props) {
   useEffect(() => {
     executeEffectRef.current = createEffectExecutor(dispatch);
     dispatch({ type: "INIT" });
+
+    // Load cached groups from localStorage
+    try {
+      const raw = localStorage.getItem("companionGroups");
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached.version === CLIENT_GROUPS_CACHE_VERSION && Array.isArray(cached.groups) && cached.groups.length > 0) {
+          dispatch({ type: "GROUPS_LOADED", groups: cached.groups });
+        }
+        localStorage.removeItem("companionGroups");
+      }
+    } catch {
+      localStorage.removeItem("companionGroups");
+    }
+
     return () => {
       dispatch({ type: "END" });
     };
   }, [dispatch]);
+
+  // Sync easyMode prop into state machine
+  useEffect(() => {
+    dispatch({ type: "SET_EASY_MODE", easyMode });
+  }, [easyMode, dispatch]);
 
   // Keyboard listeners (non-dev mode only)
   useEffect(() => {
@@ -125,6 +147,8 @@ export function PictureSpeaking({ briefing, onEnd }: Props) {
       onEnd={handleEnd}
       input={input}
       onInputChange={setInput}
+      easyMode={easyMode}
+      onToggleEasy={onToggleEasy}
     />
   );
 }

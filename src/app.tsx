@@ -96,6 +96,8 @@ export function App() {
           key={scenarioId}
           briefing={briefing}
           onEnd={handleBack}
+          easyMode={easyMode}
+          onToggleEasy={toggleEasyMode}
         />
       );
     }

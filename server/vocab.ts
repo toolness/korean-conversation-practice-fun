@@ -3,6 +3,7 @@
 import { Hono } from "hono";
 import { join } from "path";
 import { readFileSync } from "fs";
+import { CompanionPool, generateCompanionGroups } from "./companion-pool";
 
 interface WordPicture {
   type: "local-image" | "emojis";
@@ -68,9 +69,31 @@ export function loadVocab(): boolean {
   }
 }
 
+export function getAllVocabItems(): VocabItem[] {
+  return vocabItems;
+}
+
+export function getVocabItemById(id: string): VocabItem | undefined {
+  return vocabItems.find((v) => v.id === id);
+}
+
 function pickRandom(count: number): VocabItem[] {
   const shuffled = [...vocabItems].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
+// ─── Companion pool ─────────────────────────────────────────────────
+
+let companionPool: CompanionPool | null = null;
+
+/** Call after loadVocab() to start pre-generating companion pairs. */
+export function initCompanionPool(): void {
+  companionPool = new CompanionPool({
+    generate: generateCompanionGroups,
+    getVocabItems: getAllVocabItems,
+    cachePath: join(import.meta.dir, "..", ".llm_cache", "companion_pool.json"),
+  });
+  companionPool.warmUp();
 }
 
 export const vocabApp = new Hono();
@@ -82,6 +105,15 @@ vocabApp.get("/random", (c) => {
   const count = parseInt(c.req.query("count") || "3", 10);
   const items = pickRandom(count);
   return c.json({ items });
+});
+
+vocabApp.post("/companions", (c) => {
+  if (!companionPool || vocabItems.length === 0) {
+    return c.json({ groups: [] });
+  }
+  const groups = companionPool.take(2);
+  console.log(`companions: serving ${groups.length} groups (${companionPool.size()} remaining)`);
+  return c.json({ groups });
 });
 
 vocabApp.get("/assets/:filename", async (c) => {

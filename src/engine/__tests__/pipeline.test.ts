@@ -11,6 +11,7 @@ import type {
   PipelineEffect,
   VocabItem,
   WordSession,
+  WordGroup,
   Feedback,
 } from "../pipeline-types";
 
@@ -22,6 +23,12 @@ const word2: VocabItem = {
 };
 const word3: VocabItem = {
   id: "w3", hangul: "먹다", name: "To eat", isTranslation: true, pictureFilename: "eat.webp",
+};
+const word4: VocabItem = {
+  id: "w4", hangul: "노란색", name: "Yellow", isTranslation: true, pictureFilename: "yellow.webp",
+};
+const word5: VocabItem = {
+  id: "w5", hangul: "원피스", name: "Dress", isTranslation: true, pictureFilename: "dress.webp",
 };
 
 const goodFeedback: Feedback = {
@@ -58,6 +65,16 @@ beforeEach(() => {
 });
 
 describe("pipeline state machine", () => {
+  describe("initialState", () => {
+    it("defaults to easyMode: true", () => {
+      expect(initialState().easyMode).toBe(true);
+    });
+
+    it("initialState(false) returns easyMode: false", () => {
+      expect(initialState(false).easyMode).toBe(false);
+    });
+  });
+
   describe("initialization", () => {
     it("INIT emits FETCH_WORDS and sets activity to loading", () => {
       const { state, effects } = transition(initialState(), { type: "INIT" });
@@ -70,7 +87,7 @@ describe("pipeline state machine", () => {
       const { state: s2 } = transition(s1, { type: "WORDS_LOADED", words: [word1, word2] });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.word).toEqual(word1);
+        expect(s2.activity.session.words).toEqual([word1]);
       }
       expect(s2.wordPool).toEqual([word2]);
     });
@@ -175,7 +192,7 @@ describe("pipeline state machine", () => {
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.word).toEqual(word2);
+        expect(s2.activity.session.words).toEqual([word2]);
       }
       expect(s2.backgroundEvals.length).toBe(1);
     });
@@ -184,7 +201,7 @@ describe("pipeline state machine", () => {
       const state = confirmingWord1();
       const reviewSession: WordSession = {
         sessionId: "old-session",
-        word: word3,
+        words: [word3],
         thread: [
           { kind: "attempt", transcript: "먹었어요" },
           { kind: "evaluation", feedback: goodFeedback },
@@ -368,11 +385,11 @@ describe("pipeline state machine", () => {
   describe("review", () => {
     it("REVIEW_NEXT pops from reviewQueue if non-empty", () => {
       const session1: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [{ kind: "attempt", transcript: "소" }, { kind: "evaluation", feedback: goodFeedback }],
       };
       const session2: WordSession = {
-        sessionId: "s2", word: word2,
+        sessionId: "s2", words: [word2],
         thread: [{ kind: "attempt", transcript: "산" }, { kind: "evaluation", feedback: badFeedback }],
       };
       const state: PipelineState = {
@@ -391,7 +408,7 @@ describe("pipeline state machine", () => {
 
     it("REVIEW_NEXT creates new word from pool if queue empty", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [{ kind: "attempt", transcript: "소" }, { kind: "evaluation", feedback: goodFeedback }],
       };
       const state: PipelineState = {
@@ -403,13 +420,13 @@ describe("pipeline state machine", () => {
       const { state: s2 } = transition(state, { type: "REVIEW_NEXT" });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.word).toEqual(word2);
+        expect(s2.activity.session.words).toEqual([word2]);
       }
     });
 
     it("REVIEW_NEXT goes to loading if both empty", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [{ kind: "attempt", transcript: "소" }, { kind: "evaluation", feedback: goodFeedback }],
       };
       const state: PipelineState = {
@@ -425,7 +442,7 @@ describe("pipeline state machine", () => {
 
     it("REVIEW_RETRY returns to idle with same session, thread preserved", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [
           { kind: "attempt", transcript: "소가 잤에서요" },
           { kind: "evaluation", feedback: badFeedback },
@@ -446,7 +463,7 @@ describe("pipeline state machine", () => {
 
     it("REVIEW_RETRY then full cycle adds second attempt to same thread", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [
           { kind: "attempt", transcript: "소가 잤에서요" },
           { kind: "evaluation", feedback: badFeedback },
@@ -480,7 +497,7 @@ describe("pipeline state machine", () => {
   describe("chat", () => {
     it("CHAT_SEND from reviewing appends user-chat, transitions to chatting, emits SEND_CHAT", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [
           { kind: "attempt", transcript: "소가 잤어요" },
           { kind: "evaluation", feedback: badFeedback },
@@ -501,7 +518,7 @@ describe("pipeline state machine", () => {
 
     it("CHAT_RESPONSE appends assistant-chat and returns to reviewing", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [
           { kind: "attempt", transcript: "소가 잤어요" },
           { kind: "evaluation", feedback: badFeedback },
@@ -526,7 +543,7 @@ describe("pipeline state machine", () => {
 
     it("CHAT_FAILED appends error and returns to reviewing", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [{ kind: "user-chat", text: "help" }],
       };
       const state: PipelineState = {
@@ -554,11 +571,11 @@ describe("pipeline state machine", () => {
 
     it("EVAL_COMPLETE for different session during chat goes to reviewQueue", () => {
       const session: WordSession = {
-        sessionId: "s1", word: word1,
+        sessionId: "s1", words: [word1],
         thread: [{ kind: "user-chat", text: "help" }],
       };
       const bgSession: WordSession = {
-        sessionId: "s2", word: word2,
+        sessionId: "s2", words: [word2],
         thread: [{ kind: "attempt", transcript: "산에 갔어요" }],
       };
       const state: PipelineState = {
@@ -582,8 +599,8 @@ describe("pipeline state machine", () => {
       const state: PipelineState = {
         ...idleWithWord1(),
         backgroundEvals: [
-          { sessionId: "s1", abortId: "a1", session: { sessionId: "s1", word: word1, thread: [] } },
-          { sessionId: "s2", abortId: "a2", session: { sessionId: "s2", word: word2, thread: [] } },
+          { sessionId: "s1", abortId: "a1", session: { sessionId: "s1", words: [word1], thread: [] } },
+          { sessionId: "s2", abortId: "a2", session: { sessionId: "s2", words: [word2], thread: [] } },
         ],
       };
       const { state: s2, effects } = transition(state, { type: "END" });
@@ -613,6 +630,197 @@ describe("pipeline state machine", () => {
       // Pool should be [word3], which is ≤2, so FETCH_WORDS should be emitted
       const fetchEffects = s2.effects.filter((e) => e.type === "FETCH_WORDS");
       expect(fetchEffects.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("groupPool and companions", () => {
+    const group1: WordGroup = { words: [word4, word5] };
+    const group2: WordGroup = { words: [word1, word3] };
+
+    it("advanceActivity prefers groupPool when !easyMode", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "loading" },
+        wordPool: [word1, word2],
+        groupPool: [group1, group2],
+        easyMode: false,
+      };
+      const effects: PipelineEffect[] = [];
+      // Simulate WORDS_LOADED to get to idle
+      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [] });
+      // Should have used group1
+      expect(s2.activity.kind).toBe("idle");
+      if (s2.activity.kind === "idle") {
+        expect(s2.activity.session.words).toEqual([word4, word5]);
+      }
+    });
+
+    it("advanceActivity falls back to wordPool when groupPool empty", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "loading" },
+        wordPool: [word1, word2],
+        groupPool: [],
+        easyMode: false,
+      };
+      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [] });
+      expect(s2.activity.kind).toBe("idle");
+      if (s2.activity.kind === "idle") {
+        expect(s2.activity.session.words).toEqual([word1]);
+      }
+    });
+
+    it("advanceActivity ignores groupPool in easyMode", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "loading" },
+        wordPool: [word1, word2],
+        groupPool: [group1],
+        easyMode: true,
+      };
+      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [] });
+      expect(s2.activity.kind).toBe("idle");
+      if (s2.activity.kind === "idle") {
+        expect(s2.activity.session.words).toEqual([word1]);
+      }
+    });
+
+    it("GROUPS_LOADED appends to groupPool and clears companionFetchInFlight", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
+        companionFetchInFlight: true,
+        groupPool: [group1],
+      };
+      const { state: s2 } = transition(state, { type: "GROUPS_LOADED", groups: [group2] });
+      expect(s2.groupPool).toEqual([group1, group2]);
+      expect(s2.companionFetchInFlight).toBe(false);
+    });
+
+    it("GROUPS_LOADED while loading transitions to idle with group words", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "loading" },
+        companionFetchInFlight: true,
+      };
+      const { state: s2 } = transition(state, { type: "GROUPS_LOADED", groups: [group1, group2] });
+      expect(s2.activity.kind).toBe("idle");
+      if (s2.activity.kind === "idle") {
+        expect(s2.activity.session.words).toEqual([word4, word5]);
+      }
+      expect(s2.groupPool).toEqual([group2]);
+      expect(s2.companionFetchInFlight).toBe(false);
+    });
+
+    it("GROUPS_LOAD_FAILED clears inFlight flag with no user error", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
+        companionFetchInFlight: true,
+      };
+      const { state: s2 } = transition(state, { type: "GROUPS_LOAD_FAILED", error: "oops" });
+      expect(s2.companionFetchInFlight).toBe(false);
+      expect(s2.error).toBeNull();
+    });
+
+    it("SET_EASY_MODE updates state", () => {
+      const state = initialState();
+      const { state: s2 } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
+      expect(s2.easyMode).toBe(false);
+    });
+
+    it("SET_EASY_MODE to normal triggers FETCH_COMPANIONS when groupPool empty", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
+        groupPool: [],
+        companionFetchInFlight: false,
+      };
+      const { state: s2, effects } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
+      expect(effects).toContainEqual({ type: "FETCH_COMPANIONS" });
+      expect(s2.companionFetchInFlight).toBe(true);
+    });
+
+    it("FETCH_COMPANIONS emitted when groupPool <= 5 in normal mode on CONFIRM", () => {
+      // Setup: normal mode, groupPool has 4 groups (will be 3 after popping one)
+      const groups = [group1, group2, { words: [word2, word3] }, { words: [word1, word2] }];
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "confirming", session: { sessionId: "s1", words: [word1], thread: [] }, transcript: "test" },
+        easyMode: false,
+        groupPool: groups,
+        wordPool: [word2, word3],
+        companionFetchInFlight: false,
+      };
+      const { effects } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
+      expect(effects.some((e) => e.type === "FETCH_COMPANIONS")).toBe(true);
+    });
+
+    it("FETCH_COMPANIONS not emitted when already in flight", () => {
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
+        easyMode: false,
+        groupPool: [],
+        companionFetchInFlight: true,
+      };
+      const { effects } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
+      expect(effects.some((e) => e.type === "FETCH_COMPANIONS")).toBe(false);
+    });
+
+    it("session.words length 2 from groupPool", () => {
+      // Normal mode, confirm → advance picks from groupPool
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "confirming", session: { sessionId: "s1", words: [word1], thread: [] }, transcript: "test" },
+        easyMode: false,
+        groupPool: [group1],
+        wordPool: [word2, word3],
+        companionFetchInFlight: true, // prevent companion fetch noise
+      };
+      const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
+      expect(s2.activity.kind).toBe("idle");
+      if (s2.activity.kind === "idle") {
+        expect(s2.activity.session.words.length).toBe(2);
+        expect(s2.activity.session.words).toEqual([word4, word5]);
+      }
+    });
+
+    it("session.words length 1 from wordPool", () => {
+      // Normal mode but no groups → falls back to wordPool
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "confirming", session: { sessionId: "s1", words: [word1], thread: [] }, transcript: "test" },
+        easyMode: false,
+        groupPool: [],
+        wordPool: [word2, word3],
+        companionFetchInFlight: true,
+      };
+      const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
+      expect(s2.activity.kind).toBe("idle");
+      if (s2.activity.kind === "idle") {
+        expect(s2.activity.session.words.length).toBe(1);
+        expect(s2.activity.session.words).toEqual([word2]);
+      }
+    });
+
+    it("sttHint joins all words hangul", () => {
+      const session: WordSession = {
+        sessionId: "s1",
+        words: [word4, word5],
+        thread: [],
+      };
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "recording", session },
+      };
+      const { effects } = transition(state, { type: "RECORD_STOP" });
+      const sttEffect = effects.find((e) => e.type === "STOP_RECORDING_AND_TRANSCRIBE");
+      expect(sttEffect).toBeTruthy();
+      if (sttEffect && sttEffect.type === "STOP_RECORDING_AND_TRANSCRIBE") {
+        expect(sttEffect.sttHint).toContain("노란색");
+        expect(sttEffect.sttHint).toContain("원피스");
+      }
     });
   });
 });

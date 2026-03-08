@@ -6,6 +6,7 @@ import type {
   PipelineEffect,
   WordSession,
   VocabItem,
+  WordGroup,
   Feedback,
   Activity,
 } from "./pipeline-types";
@@ -15,12 +16,15 @@ export interface TransitionResult {
   effects: PipelineEffect[];
 }
 
-export function initialState(): PipelineState {
+export function initialState(easyMode = true): PipelineState {
   return {
     activity: { kind: "loading" },
     reviewQueue: [],
     backgroundEvals: [],
     wordPool: [],
+    groupPool: [],
+    companionFetchInFlight: false,
+    easyMode,
     nextAbortId: 1,
     error: null,
   };
@@ -35,8 +39,23 @@ export function _resetSessionCounter(): void {
   _sessionCounter = 0;
 }
 
-function makeSession(word: VocabItem, sessionId?: string): WordSession {
-  return { sessionId: sessionId || makeSessionId(), word, thread: [] };
+function makeSession(words: VocabItem[], sessionId?: string): WordSession {
+  return { sessionId: sessionId || makeSessionId(), words, thread: [] };
+}
+
+/** Emit FETCH_COMPANIONS if conditions are met. */
+function maybeFetchCompanions(
+  state: PipelineState,
+  effects: PipelineEffect[]
+): void {
+  if (
+    !state.easyMode &&
+    state.groupPool.length <= 5 &&
+    !state.companionFetchInFlight &&
+    !effects.some((e) => e.type === "FETCH_COMPANIONS")
+  ) {
+    effects.push({ type: "FETCH_COMPANIONS" });
+  }
 }
 
 /** Pick the next activity after sending an item to background eval. */
@@ -47,8 +66,11 @@ function advanceActivity(
   if (state.reviewQueue.length > 0) {
     return { kind: "reviewing", session: state.reviewQueue[0] };
   }
+  if (!state.easyMode && state.groupPool.length > 0) {
+    return { kind: "idle", session: makeSession(state.groupPool[0].words) };
+  }
   if (state.wordPool.length > 0) {
-    return { kind: "idle", session: makeSession(state.wordPool[0]) };
+    return { kind: "idle", session: makeSession([state.wordPool[0]]) };
   }
   effects.push({ type: "FETCH_WORDS", count: 5 });
   return { kind: "loading" };
@@ -69,9 +91,22 @@ function shiftWordPool(state: PipelineState): PipelineState {
   if (
     state.activity.kind === "idle" &&
     state.wordPool.length > 0 &&
-    state.wordPool[0].id === state.activity.session.word.id
+    state.activity.session.words.length === 1 &&
+    state.wordPool[0].id === state.activity.session.words[0].id
   ) {
     return { ...state, wordPool: state.wordPool.slice(1) };
+  }
+  return state;
+}
+
+function shiftGroupPool(state: PipelineState): PipelineState {
+  if (
+    state.activity.kind === "idle" &&
+    state.groupPool.length > 0 &&
+    state.activity.session.words.length === state.groupPool[0].words.length &&
+    state.activity.session.words[0].id === state.groupPool[0].words[0].id
+  ) {
+    return { ...state, groupPool: state.groupPool.slice(1) };
   }
   return state;
 }
@@ -97,11 +132,25 @@ export function transition(
             effects,
           };
         }
+        // In normal mode, try groupPool first
+        if (!state.easyMode && state.groupPool.length > 0) {
+          const group = state.groupPool[0];
+          return {
+            state: {
+              ...state,
+              activity: { kind: "idle", session: makeSession(group.words) },
+              wordPool: pool,
+              groupPool: state.groupPool.slice(1),
+              error: null,
+            },
+            effects,
+          };
+        }
         const [first, ...rest] = pool;
         return {
           state: {
             ...state,
-            activity: { kind: "idle", session: makeSession(first) },
+            activity: { kind: "idle", session: makeSession([first]) },
             wordPool: rest,
             error: null,
           },
@@ -113,6 +162,43 @@ export function transition(
 
     case "WORDS_LOAD_FAILED": {
       return { state: { ...state, error: event.error }, effects };
+    }
+
+    case "GROUPS_LOADED": {
+      let nextState = {
+        ...state,
+        groupPool: [...state.groupPool, ...event.groups],
+        companionFetchInFlight: false,
+      };
+      // If loading (waiting for words) and we got groups, go idle with first group
+      if (nextState.activity.kind === "loading" && event.groups.length > 0) {
+        const group = nextState.groupPool[0];
+        nextState = {
+          ...nextState,
+          activity: { kind: "idle", session: makeSession(group.words) },
+          groupPool: nextState.groupPool.slice(1),
+          error: null,
+        };
+      }
+      return { state: nextState, effects };
+    }
+
+    case "GROUPS_LOAD_FAILED": {
+      return {
+        state: { ...state, companionFetchInFlight: false },
+        effects,
+      };
+    }
+
+    case "SET_EASY_MODE": {
+      let nextState = { ...state, easyMode: event.easyMode };
+      if (!event.easyMode) {
+        maybeFetchCompanions(nextState, effects);
+        if (effects.some((e) => e.type === "FETCH_COMPANIONS")) {
+          nextState = { ...nextState, companionFetchInFlight: true };
+        }
+      }
+      return { state: nextState, effects };
     }
 
     case "RECORD_START": {
@@ -127,7 +213,8 @@ export function transition(
     case "RECORD_STOP": {
       if (state.activity.kind !== "recording") return { state, effects };
       const session = state.activity.session;
-      effects.push({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint: `${session.word.hangul}. 여보세요, 거기 집이지요? 네, 그런데요.` });
+      const sttHint = session.words.map((w) => w.hangul).join(", ") + ". 여보세요, 거기 집이지요? 네, 그런데요.";
+      effects.push({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint });
       return {
         state: { ...state, activity: { kind: "transcribing", session } },
         effects,
@@ -222,10 +309,17 @@ export function transition(
       nextState = { ...nextState, activity: nextActivity };
       nextState = shiftReviewQueue(nextState);
       nextState = shiftWordPool(nextState);
+      nextState = shiftGroupPool(nextState);
 
       // If pool is getting low, prefetch more
       if (nextState.wordPool.length <= 2 && !effects.some(e => e.type === "FETCH_WORDS")) {
         effects.push({ type: "FETCH_WORDS", count: 5 });
+      }
+
+      // Maybe fetch companions
+      maybeFetchCompanions(nextState, effects);
+      if (effects.some((e) => e.type === "FETCH_COMPANIONS")) {
+        nextState = { ...nextState, companionFetchInFlight: true };
       }
 
       return { state: nextState, effects };
@@ -325,6 +419,7 @@ export function transition(
       nextState = { ...nextState, activity: nextActivity };
       nextState = shiftReviewQueue(nextState);
       nextState = shiftWordPool(nextState);
+      nextState = shiftGroupPool(nextState);
       return { state: nextState, effects };
     }
 

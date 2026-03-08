@@ -4,6 +4,8 @@ import type { PipelineEvent, PipelineEffect, Feedback } from "../engine/pipeline
 import { buildEvalPrompt, buildChatPrompt } from "../engine/pipeline-prompts";
 import { downsample, encodeWAV } from "../utils/audio";
 
+export const CLIENT_GROUPS_CACHE_VERSION = 1;
+
 interface RecordingState {
   stream: MediaStream;
   audioCtx: AudioContext;
@@ -51,6 +53,28 @@ export function createEffectExecutor(dispatch: (e: PipelineEvent) => void) {
           })
           .catch(() => {
             dispatch({ type: "WORDS_LOAD_FAILED", error: "Could not load vocabulary" });
+          });
+        break;
+      }
+
+      case "FETCH_COMPANIONS": {
+        fetch("/api/vocab/companions", { method: "POST" })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.groups && data.groups.length > 0) {
+              dispatch({ type: "GROUPS_LOADED", groups: data.groups });
+              try {
+                localStorage.setItem("companionGroups", JSON.stringify({
+                  version: CLIENT_GROUPS_CACHE_VERSION,
+                  groups: data.groups,
+                }));
+              } catch {}
+            } else {
+              dispatch({ type: "GROUPS_LOAD_FAILED", error: "No companion groups returned" });
+            }
+          })
+          .catch(() => {
+            dispatch({ type: "GROUPS_LOAD_FAILED", error: "Could not fetch companions" });
           });
         break;
       }
