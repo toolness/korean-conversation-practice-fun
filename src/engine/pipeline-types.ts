@@ -65,7 +65,6 @@ export interface PipelineState {
   backgroundEvals: BackgroundEval[];
   wordPool: VocabItem[];
   groupPool: WordGroup[];
-  companionFetchInFlight: boolean;
   easyMode: boolean;
   nextAbortId: number;
   error: string | null;
@@ -101,7 +100,6 @@ export type PipelineEvent =
 
 export type PipelineEffect =
   | { type: "FETCH_WORDS"; count: number }
-  | { type: "FETCH_COMPANIONS" }
   | { type: "START_RECORDING" }
   | { type: "STOP_RECORDING_AND_TRANSCRIBE"; sttHint: string }
   | { type: "CANCEL_RECORDING" }

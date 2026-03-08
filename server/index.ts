@@ -3,7 +3,7 @@ import { join } from "path";
 import { writeFileSync } from "fs";
 import { bootClient, sendPrompt, shutdownClient } from "./llm";
 import { transcribe } from "./stt";
-import { loadVocab, initCompanionPool, vocabApp } from "./vocab";
+import { loadVocab, vocabApp } from "./vocab";
 
 const app = new Hono();
 const DIST_DIR = join(import.meta.dir, "..", "dist");
@@ -69,9 +69,7 @@ const { port } = parseArgs();
 
 // Boot LLM client and load vocab data, then start server
 await bootClient();
-if (loadVocab()) {
-  initCompanionPool();
-}
+loadVocab();
 
 // ─── Static file serving via Bun.serve ──────────────────────────────
 

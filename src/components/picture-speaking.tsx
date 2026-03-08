@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { Briefing } from "../scenarios/index";
 import type { PipelineState, PipelineEvent, Activity } from "../engine/pipeline-types";
 import { transition, initialState } from "../engine/pipeline";
-import { createEffectExecutor, CLIENT_GROUPS_CACHE_VERSION } from "./pipeline-effects";
+import { createEffectExecutor } from "./pipeline-effects";
 import { PipelineView } from "./pipeline-view";
 
 const DEV_MODE =
@@ -80,20 +80,6 @@ export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy }: Pro
   useEffect(() => {
     executeEffectRef.current = createEffectExecutor(dispatch);
     dispatch({ type: "INIT" });
-
-    // Load cached groups from localStorage
-    try {
-      const raw = localStorage.getItem("companionGroups");
-      if (raw) {
-        const cached = JSON.parse(raw);
-        if (cached.version === CLIENT_GROUPS_CACHE_VERSION && Array.isArray(cached.groups) && cached.groups.length > 0) {
-          dispatch({ type: "GROUPS_LOADED", groups: cached.groups });
-        }
-        localStorage.removeItem("companionGroups");
-      }
-    } catch {
-      localStorage.removeItem("companionGroups");
-    }
 
     return () => {
       dispatch({ type: "END" });

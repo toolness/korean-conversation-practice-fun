@@ -23,7 +23,6 @@ export function initialState(easyMode = true): PipelineState {
     backgroundEvals: [],
     wordPool: [],
     groupPool: [],
-    companionFetchInFlight: false,
     easyMode,
     nextAbortId: 1,
     error: null,
@@ -41,21 +40,6 @@ export function _resetSessionCounter(): void {
 
 function makeSession(words: VocabItem[], sessionId?: string): WordSession {
   return { sessionId: sessionId || makeSessionId(), words, thread: [] };
-}
-
-/** Emit FETCH_COMPANIONS if conditions are met. */
-function maybeFetchCompanions(
-  state: PipelineState,
-  effects: PipelineEffect[]
-): void {
-  if (
-    !state.easyMode &&
-    state.groupPool.length <= 5 &&
-    !state.companionFetchInFlight &&
-    !effects.some((e) => e.type === "FETCH_COMPANIONS")
-  ) {
-    effects.push({ type: "FETCH_COMPANIONS" });
-  }
 }
 
 /** Pick the next activity after sending an item to background eval. */
@@ -168,7 +152,6 @@ export function transition(
       let nextState = {
         ...state,
         groupPool: [...state.groupPool, ...event.groups],
-        companionFetchInFlight: false,
       };
       // If loading (waiting for words) and we got groups, go idle with first group
       if (nextState.activity.kind === "loading" && !nextState.easyMode && event.groups.length > 0) {
@@ -184,20 +167,11 @@ export function transition(
     }
 
     case "GROUPS_LOAD_FAILED": {
-      return {
-        state: { ...state, companionFetchInFlight: false },
-        effects,
-      };
+      return { state, effects };
     }
 
     case "SET_EASY_MODE": {
       let nextState = { ...state, easyMode: event.easyMode };
-      if (!event.easyMode) {
-        maybeFetchCompanions(nextState, effects);
-        if (effects.some((e) => e.type === "FETCH_COMPANIONS")) {
-          nextState = { ...nextState, companionFetchInFlight: true };
-        }
-      }
       // Advance to next word so the new mode takes effect immediately
       if (nextState.activity.kind === "idle") {
         const nextActivity = advanceActivity(nextState, effects);
@@ -322,12 +296,6 @@ export function transition(
       // If pool is getting low, prefetch more
       if (nextState.wordPool.length <= 2 && !effects.some(e => e.type === "FETCH_WORDS")) {
         effects.push({ type: "FETCH_WORDS", count: 5 });
-      }
-
-      // Maybe fetch companions
-      maybeFetchCompanions(nextState, effects);
-      if (effects.some((e) => e.type === "FETCH_COMPANIONS")) {
-        nextState = { ...nextState, companionFetchInFlight: true };
       }
 
       return { state: nextState, effects };

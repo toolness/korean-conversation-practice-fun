@@ -6,7 +6,8 @@
     "start": "bun run server/index.ts",
     "build": "bun run build.ts",
     "dev": "bun run build.ts --watch & bun run server/index.ts --port 8000",
-    "test": "bun test"
+    "test": "bun test",
+    "generate-collocates": "bun run scripts/generate-collocates.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest",

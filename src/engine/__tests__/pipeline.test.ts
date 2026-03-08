@@ -685,41 +685,35 @@ describe("pipeline state machine", () => {
       }
     });
 
-    it("GROUPS_LOADED appends to groupPool and clears companionFetchInFlight", () => {
+    it("GROUPS_LOADED appends to groupPool", () => {
       const state: PipelineState = {
         ...initialState(),
         activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-        companionFetchInFlight: true,
         groupPool: [group1],
       };
       const { state: s2 } = transition(state, { type: "GROUPS_LOADED", groups: [group2] });
       expect(s2.groupPool).toEqual([group1, group2]);
-      expect(s2.companionFetchInFlight).toBe(false);
     });
 
     it("GROUPS_LOADED while loading transitions to idle with group words", () => {
       const state: PipelineState = {
         ...initialState(false),
         activity: { kind: "loading" },
-        companionFetchInFlight: true,
-      };
+              };
       const { state: s2 } = transition(state, { type: "GROUPS_LOADED", groups: [group1, group2] });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
         expect(s2.activity.session.words).toEqual([word4, word5]);
       }
       expect(s2.groupPool).toEqual([group2]);
-      expect(s2.companionFetchInFlight).toBe(false);
     });
 
-    it("GROUPS_LOAD_FAILED clears inFlight flag with no user error", () => {
+    it("GROUPS_LOAD_FAILED is a no-op", () => {
       const state: PipelineState = {
         ...initialState(),
         activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-        companionFetchInFlight: true,
       };
       const { state: s2 } = transition(state, { type: "GROUPS_LOAD_FAILED", error: "oops" });
-      expect(s2.companionFetchInFlight).toBe(false);
       expect(s2.error).toBeNull();
     });
 
@@ -727,19 +721,6 @@ describe("pipeline state machine", () => {
       const state = initialState();
       const { state: s2 } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
       expect(s2.easyMode).toBe(false);
-    });
-
-    it("SET_EASY_MODE to normal triggers FETCH_COMPANIONS when groupPool empty", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-        groupPool: [],
-        wordPool: [word2],
-        companionFetchInFlight: false,
-      };
-      const { state: s2, effects } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
-      expect(effects).toContainEqual({ type: "FETCH_COMPANIONS" });
-      expect(s2.companionFetchInFlight).toBe(true);
     });
 
     it("SET_EASY_MODE while idle advances to next word immediately", () => {
@@ -774,34 +755,6 @@ describe("pipeline state machine", () => {
       }
     });
 
-    it("FETCH_COMPANIONS emitted when groupPool <= 5 in normal mode on CONFIRM", () => {
-      // Setup: normal mode, groupPool has 4 groups (will be 3 after popping one)
-      const groups = [group1, group2, { words: [word2, word3] }, { words: [word1, word2] }];
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "confirming", session: { sessionId: "s1", words: [word1], thread: [] }, transcript: "test" },
-        easyMode: false,
-        groupPool: groups,
-        wordPool: [word2, word3],
-        companionFetchInFlight: false,
-      };
-      const { effects } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
-      expect(effects.some((e) => e.type === "FETCH_COMPANIONS")).toBe(true);
-    });
-
-    it("FETCH_COMPANIONS not emitted when already in flight", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-        easyMode: false,
-        groupPool: [],
-        wordPool: [word2],
-        companionFetchInFlight: true,
-      };
-      const { effects } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
-      expect(effects.some((e) => e.type === "FETCH_COMPANIONS")).toBe(false);
-    });
-
     it("session.words length 2 from groupPool", () => {
       // Normal mode, confirm → advance picks from groupPool
       const state: PipelineState = {
@@ -810,7 +763,6 @@ describe("pipeline state machine", () => {
         easyMode: false,
         groupPool: [group1],
         wordPool: [word2, word3],
-        companionFetchInFlight: true, // prevent companion fetch noise
       };
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       expect(s2.activity.kind).toBe("idle");
@@ -828,8 +780,7 @@ describe("pipeline state machine", () => {
         easyMode: false,
         groupPool: [],
         wordPool: [word2, word3],
-        companionFetchInFlight: true,
-      };
+              };
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
