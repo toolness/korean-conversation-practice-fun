@@ -47,7 +47,7 @@ The student's latest attempt: "${transcript}"
 Evaluate their sentence:
 1. Is it grammatically correct? (particles, conjugation, word order)
 2. Does it use the target vocabulary?
-3. Brief feedback (1-2 sentences, in English)
+3. Brief feedback (1-2 sentences, in English). If the sentence is correct, include an English translation so the student can verify they said what they intended.
 4. A natural Korean example sentence using this word
 
 IMPORTANT: The student's input comes through speech-to-text and may contain
