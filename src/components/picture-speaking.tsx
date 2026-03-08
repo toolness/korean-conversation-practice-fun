@@ -16,12 +16,23 @@ interface Props {
   onEnd: () => void;
 }
 
+function lastEvalCorrect(activity: Activity): boolean {
+  if (!("session" in activity)) return false;
+  const thread = activity.session.thread;
+  for (let i = thread.length - 1; i >= 0; i--) {
+    if (thread[i].kind === "evaluation") return thread[i].feedback.correct;
+  }
+  return false;
+}
+
 function mapKeyDown(e: KeyboardEvent, activity: Activity): PipelineEvent | null {
   if (e.key === "Escape") {
     switch (activity.kind) {
       case "recording": return { type: "RECORD_CANCEL" };
       case "confirming": return { type: "REJECT_TRANSCRIPT" };
-      case "reviewing": return { type: "REVIEW_RETRY" };
+      case "reviewing": return lastEvalCorrect(activity)
+        ? { type: "REVIEW_RETRY" }
+        : { type: "REVIEW_NEXT" };
       default: return null;
     }
   }
@@ -29,7 +40,9 @@ function mapKeyDown(e: KeyboardEvent, activity: Activity): PipelineEvent | null 
     switch (activity.kind) {
       case "idle": return { type: "RECORD_START" };
       case "confirming": return { type: "CONFIRM_TRANSCRIPT" };
-      case "reviewing": return { type: "REVIEW_NEXT" };
+      case "reviewing": return lastEvalCorrect(activity)
+        ? { type: "REVIEW_NEXT" }
+        : { type: "REVIEW_RETRY" };
       default: return null;
     }
   }

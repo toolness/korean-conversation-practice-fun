@@ -2,7 +2,17 @@
 
 import React, { useRef, useEffect } from "react";
 import type { PipelineState, PipelineEvent, WordSession, ThreadMessage } from "../engine/pipeline-types";
+import type { Activity } from "../engine/pipeline-types";
 import { getNotionPageUrl } from "../utils/notion";
+
+function lastEvalCorrect(activity: Activity): boolean {
+  if (!("session" in activity)) return false;
+  const thread = activity.session.thread;
+  for (let i = thread.length - 1; i >= 0; i--) {
+    if (thread[i].kind === "evaluation") return thread[i].feedback.correct;
+  }
+  return false;
+}
 
 interface Props {
   state: PipelineState;
@@ -139,22 +149,26 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   const text = input.trim();
-                  if (!text) return;
                   if (activity.kind === "idle") {
+                    if (!text) return;
                     dispatch({ type: "DEV_SUBMIT", text });
                     onInputChange("");
                   } else if (activity.kind === "confirming") {
                     dispatch({ type: "CONFIRM_TRANSCRIPT" });
                   } else if (activity.kind === "reviewing") {
-                    dispatch({ type: "CHAT_SEND", text });
-                    onInputChange("");
+                    if (text) {
+                      dispatch({ type: "CHAT_SEND", text });
+                      onInputChange("");
+                    } else {
+                      dispatch({ type: lastEvalCorrect(activity) ? "REVIEW_NEXT" : "REVIEW_RETRY" });
+                    }
                   }
                 } else if (e.key === "Escape") {
                   e.preventDefault();
                   if (activity.kind === "confirming") {
                     dispatch({ type: "REJECT_TRANSCRIPT" });
                   } else if (activity.kind === "reviewing") {
-                    dispatch({ type: "REVIEW_RETRY" });
+                    dispatch({ type: lastEvalCorrect(activity) ? "REVIEW_RETRY" : "REVIEW_NEXT" });
                   }
                 }
               }}
@@ -162,7 +176,9 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
                 activity.kind === "confirming"
                   ? "Enter to confirm · Esc to redo"
                   : activity.kind === "reviewing"
-                    ? "Type to chat with tutor · Esc to retry · Enter for next"
+                    ? lastEvalCorrect(activity)
+                      ? "Type to chat · Esc to retry · Enter for next"
+                      : "Type to chat · Esc to skip · Enter to retry"
                     : "Type Korean here (dev mode)..."
               }
               disabled={activity.kind === "chatting"}
@@ -200,20 +216,37 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
               </>
             )}
             {activity.kind === "reviewing" && (
-              <>
-                <button
-                  className="btn btn-outline"
-                  onClick={() => dispatch({ type: "REVIEW_RETRY" })}
-                >
-                  Retry
-                </button>
-                <button
-                  className="btn btn-success"
-                  onClick={() => dispatch({ type: "REVIEW_NEXT" })}
-                >
-                  Next
-                </button>
-              </>
+              lastEvalCorrect(activity) ? (
+                <>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => dispatch({ type: "REVIEW_RETRY" })}
+                  >
+                    Retry
+                  </button>
+                  <button
+                    className="btn btn-success"
+                    onClick={() => dispatch({ type: "REVIEW_NEXT" })}
+                  >
+                    Next
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => dispatch({ type: "REVIEW_NEXT" })}
+                  >
+                    Skip
+                  </button>
+                  <button
+                    className="btn btn-success"
+                    onClick={() => dispatch({ type: "REVIEW_RETRY" })}
+                  >
+                    Retry
+                  </button>
+                </>
+              )
             )}
           </div>
           <StatusHint state={state} />
@@ -230,7 +263,9 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
           : activity.kind === "confirming"
             ? "Space to confirm · Esc to redo"
             : activity.kind === "reviewing"
-              ? "Space for next word · Esc to retry"
+              ? lastEvalCorrect(activity)
+                ? "Space for next word · Esc to retry"
+                : "Space to retry · Esc to skip"
               : activity.kind === "chatting"
                 ? "Waiting for tutor..."
                 : "Hold Space to speak";
