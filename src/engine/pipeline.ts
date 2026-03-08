@@ -127,7 +127,7 @@ export function transition(
     case "RECORD_STOP": {
       if (state.activity.kind !== "recording") return { state, effects };
       const session = state.activity.session;
-      effects.push({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint: session.word.hangul });
+      effects.push({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint: `${session.word.hangul}. 여보세요, 거기 집이지요? 네, 그런데요.` });
       return {
         state: { ...state, activity: { kind: "transcribing", session } },
         effects,

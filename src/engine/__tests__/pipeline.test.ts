@@ -103,7 +103,7 @@ describe("pipeline state machine", () => {
       const { state: s3, effects } = transition(s2, { type: "RECORD_STOP" });
       expect(s3.activity.kind).toBe("transcribing");
       expect(effects).toContainEqual(
-        expect.objectContaining({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint: "소" })
+        expect.objectContaining({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint: expect.stringContaining("소") })
       );
     });
 
