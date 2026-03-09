@@ -6,10 +6,11 @@ import type {
   PipelineEffect,
   WordSession,
   VocabItem,
-  WordGroup,
   Feedback,
   Activity,
 } from "./pipeline-types";
+import { pickNext } from "./word-picker";
+import collocatesData from "../../data/collocates.json";
 
 export interface TransitionResult {
   state: PipelineState;
@@ -21,8 +22,8 @@ export function initialState(easyMode = true): PipelineState {
     activity: { kind: "loading" },
     reviewQueue: [],
     backgroundEvals: [],
-    wordPool: [],
-    groupPool: [],
+    vocabCatalog: [],
+    recentWordIds: [],
     easyMode,
     nextAbortId: 1,
     error: null,
@@ -42,22 +43,32 @@ function makeSession(words: VocabItem[], sessionId?: string): WordSession {
   return { sessionId: sessionId || makeSessionId(), words, thread: [] };
 }
 
-/** Pick the next activity after sending an item to background eval. */
+const RECENT_CAP = 10;
+
+function appendRecent(recentWordIds: string[], words: VocabItem[]): string[] {
+  const updated = [...recentWordIds, ...words.map((w) => w.id)];
+  return updated.slice(-RECENT_CAP);
+}
+
+/** Pick the next activity. Uses pickNext for word selection. */
 function advanceActivity(
   state: PipelineState,
   effects: PipelineEffect[]
-): Activity {
+): { activity: Activity; recentWordIds: string[] } {
   if (state.reviewQueue.length > 0) {
-    return { kind: "reviewing", session: state.reviewQueue[0] };
+    return { activity: { kind: "reviewing", session: state.reviewQueue[0] }, recentWordIds: state.recentWordIds };
   }
-  if (!state.easyMode && state.groupPool.length > 0) {
-    return { kind: "idle", session: makeSession(state.groupPool[0].words) };
+  if (state.vocabCatalog.length > 0) {
+    const words = pickNext(state.vocabCatalog, collocatesData, state.recentWordIds, state.easyMode);
+    if (words) {
+      return {
+        activity: { kind: "idle", session: makeSession(words) },
+        recentWordIds: appendRecent(state.recentWordIds, words),
+      };
+    }
   }
-  if (state.wordPool.length > 0) {
-    return { kind: "idle", session: makeSession([state.wordPool[0]]) };
-  }
-  effects.push({ type: "FETCH_WORDS", count: 5 });
-  return { kind: "loading" };
+  effects.push({ type: "LOAD_VOCAB" });
+  return { activity: { kind: "loading" }, recentWordIds: state.recentWordIds };
 }
 
 function shiftReviewQueue(state: PipelineState): PipelineState {
@@ -71,30 +82,6 @@ function shiftReviewQueue(state: PipelineState): PipelineState {
   return state;
 }
 
-function shiftWordPool(state: PipelineState): PipelineState {
-  if (
-    state.activity.kind === "idle" &&
-    state.wordPool.length > 0 &&
-    state.activity.session.words.length === 1 &&
-    state.wordPool[0].id === state.activity.session.words[0].id
-  ) {
-    return { ...state, wordPool: state.wordPool.slice(1) };
-  }
-  return state;
-}
-
-function shiftGroupPool(state: PipelineState): PipelineState {
-  if (
-    state.activity.kind === "idle" &&
-    state.groupPool.length > 0 &&
-    state.activity.session.words.length === state.groupPool[0].words.length &&
-    state.activity.session.words[0].id === state.groupPool[0].words[0].id
-  ) {
-    return { ...state, groupPool: state.groupPool.slice(1) };
-  }
-  return state;
-}
-
 export function transition(
   state: PipelineState,
   event: PipelineEvent
@@ -103,82 +90,37 @@ export function transition(
 
   switch (event.type) {
     case "INIT": {
-      effects.push({ type: "FETCH_WORDS", count: 5 });
+      effects.push({ type: "LOAD_VOCAB" });
       return { state: { ...state, activity: { kind: "loading" }, error: null }, effects };
     }
 
-    case "WORDS_LOADED": {
-      const pool = [...state.wordPool, ...event.words];
-      if (state.activity.kind === "loading") {
-        if (pool.length === 0) {
-          return {
-            state: { ...state, error: "No vocabulary words available" },
-            effects,
-          };
-        }
-        // In normal mode, try groupPool first
-        if (!state.easyMode && state.groupPool.length > 0) {
-          const group = state.groupPool[0];
-          return {
-            state: {
-              ...state,
-              activity: { kind: "idle", session: makeSession(group.words) },
-              wordPool: pool,
-              groupPool: state.groupPool.slice(1),
-              error: null,
-            },
-            effects,
-          };
-        }
-        const [first, ...rest] = pool;
+    case "VOCAB_LOADED": {
+      const catalog = event.items;
+      if (catalog.length === 0) {
         return {
-          state: {
-            ...state,
-            activity: { kind: "idle", session: makeSession([first]) },
-            wordPool: rest,
-            error: null,
-          },
+          state: { ...state, error: "No vocabulary words available" },
           effects,
         };
       }
-      return { state: { ...state, wordPool: pool }, effects };
-    }
-
-    case "WORDS_LOAD_FAILED": {
-      return { state: { ...state, error: event.error }, effects };
-    }
-
-    case "GROUPS_LOADED": {
-      let nextState = {
-        ...state,
-        groupPool: [...state.groupPool, ...event.groups],
-      };
-      // If loading (waiting for words) and we got groups, go idle with first group
-      if (nextState.activity.kind === "loading" && !nextState.easyMode && event.groups.length > 0) {
-        const group = nextState.groupPool[0];
-        nextState = {
-          ...nextState,
-          activity: { kind: "idle", session: makeSession(group.words) },
-          groupPool: nextState.groupPool.slice(1),
-          error: null,
-        };
+      let nextState = { ...state, vocabCatalog: catalog, error: null };
+      if (nextState.activity.kind === "loading") {
+        const { activity, recentWordIds } = advanceActivity(nextState, effects);
+        nextState = { ...nextState, activity, recentWordIds };
+        nextState = shiftReviewQueue(nextState);
       }
       return { state: nextState, effects };
     }
 
-    case "GROUPS_LOAD_FAILED": {
-      return { state, effects };
+    case "VOCAB_LOAD_FAILED": {
+      return { state: { ...state, error: event.error }, effects };
     }
 
     case "SET_EASY_MODE": {
       let nextState = { ...state, easyMode: event.easyMode };
-      // Advance to next word so the new mode takes effect immediately
       if (nextState.activity.kind === "idle") {
-        const nextActivity = advanceActivity(nextState, effects);
-        nextState = { ...nextState, activity: nextActivity };
+        const { activity, recentWordIds } = advanceActivity(nextState, effects);
+        nextState = { ...nextState, activity, recentWordIds };
         nextState = shiftReviewQueue(nextState);
-        nextState = shiftWordPool(nextState);
-        nextState = shiftGroupPool(nextState);
       }
       return { state: nextState, effects };
     }
@@ -258,7 +200,6 @@ export function transition(
       if (state.activity.kind !== "confirming") return { state, effects };
       const { session, transcript } = state.activity;
 
-      // Append attempt to thread
       const updatedSession: WordSession = {
         ...session,
         thread: [...session.thread, { kind: "attempt", transcript }],
@@ -275,28 +216,19 @@ export function transition(
         (e) => e.sessionId !== session.sessionId
       );
 
-      // Start background evaluation
       const abortId = `abort_${state.nextAbortId}`;
       effects.push({ type: "EVALUATE", session: updatedSession, abortId });
       const newBgEval = { sessionId: session.sessionId, abortId, session: updatedSession };
 
-      // Determine next activity
       let nextState: PipelineState = {
         ...state,
         backgroundEvals: [...remainingEvals, newBgEval],
         nextAbortId: state.nextAbortId + 1,
       };
 
-      const nextActivity = advanceActivity(nextState, effects);
-      nextState = { ...nextState, activity: nextActivity };
+      const { activity, recentWordIds } = advanceActivity(nextState, effects);
+      nextState = { ...nextState, activity, recentWordIds };
       nextState = shiftReviewQueue(nextState);
-      nextState = shiftWordPool(nextState);
-      nextState = shiftGroupPool(nextState);
-
-      // If pool is getting low, prefetch more
-      if (nextState.wordPool.length <= 2 && !effects.some(e => e.type === "FETCH_WORDS")) {
-        effects.push({ type: "FETCH_WORDS", count: 5 });
-      }
 
       return { state: nextState, effects };
     }
@@ -313,11 +245,10 @@ export function transition(
     }
 
     case "EVAL_COMPLETE": {
-      // Remove from background evals
       const bgEval = state.backgroundEvals.find(
         (e) => e.sessionId === event.sessionId
       );
-      if (!bgEval) return { state, effects }; // already cancelled
+      if (!bgEval) return { state, effects };
 
       const remainingEvals = state.backgroundEvals.filter(
         (e) => e.abortId !== bgEval.abortId
@@ -325,7 +256,6 @@ export function transition(
 
       const evalMessage = { kind: "evaluation" as const, feedback: event.feedback };
 
-      // If user is currently reviewing or chatting about THIS session, update in-place
       if (
         (state.activity.kind === "reviewing" || state.activity.kind === "chatting") &&
         state.activity.session.sessionId === event.sessionId
@@ -344,7 +274,6 @@ export function transition(
         };
       }
 
-      // Build the completed session from the snapshot stored in backgroundEvals
       const completedSession: WordSession = {
         ...bgEval.session,
         thread: [...bgEval.session.thread, evalMessage],
@@ -352,7 +281,6 @@ export function transition(
 
       const newQueue = [...state.reviewQueue, completedSession];
 
-      // If loading (no words to show), pop to reviewing immediately
       if (state.activity.kind === "loading") {
         return {
           state: {
@@ -391,11 +319,9 @@ export function transition(
     case "REVIEW_NEXT": {
       if (state.activity.kind !== "reviewing" && state.activity.kind !== "idle") return { state, effects };
       let nextState = { ...state };
-      const nextActivity = advanceActivity(nextState, effects);
-      nextState = { ...nextState, activity: nextActivity };
+      const { activity, recentWordIds } = advanceActivity(nextState, effects);
+      nextState = { ...nextState, activity, recentWordIds };
       nextState = shiftReviewQueue(nextState);
-      nextState = shiftWordPool(nextState);
-      nextState = shiftGroupPool(nextState);
       return { state: nextState, effects };
     }
 

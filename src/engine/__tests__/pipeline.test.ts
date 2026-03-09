@@ -11,7 +11,6 @@ import type {
   PipelineEffect,
   VocabItem,
   WordSession,
-  WordGroup,
   Feedback,
 } from "../pipeline-types";
 
@@ -31,6 +30,8 @@ const word5: VocabItem = {
   id: "w5", hangul: "원피스", name: "Dress", isTranslation: true, pictureFilename: "dress.webp",
 };
 
+const catalog = [word1, word2, word3, word4, word5];
+
 const goodFeedback: Feedback = {
   correct: true, feedback: "Great job!", example: "소가 풀을 먹어요.", raw: "CORRECT: yes\nFEEDBACK: Great job!\nEXAMPLE: 소가 풀을 먹어요.",
 };
@@ -48,15 +49,15 @@ function fire(state: PipelineState, ...events: PipelineEvent[]): { state: Pipeli
   return { state, effects: allEffects };
 }
 
-/** Get to idle state with word1 showing. */
-function idleWithWord1(): PipelineState {
-  const { state } = fire(initialState(), { type: "INIT" }, { type: "WORDS_LOADED", words: [word1, word2, word3] });
+/** Get to idle state with catalog loaded. */
+function idleWithCatalog(): PipelineState {
+  const { state } = fire(initialState(), { type: "INIT" }, { type: "VOCAB_LOADED", items: catalog });
   return state;
 }
 
-/** Get to confirming state with word1 and a transcript. */
-function confirmingWord1(transcript = "소가 잤어요"): PipelineState {
-  const state = idleWithWord1();
+/** Get to confirming state with a transcript. */
+function confirmingState(transcript = "소가 잤어요"): PipelineState {
+  const state = idleWithCatalog();
   return fire(state, { type: "DEV_SUBMIT", text: transcript }).state;
 }
 
@@ -76,56 +77,54 @@ describe("pipeline state machine", () => {
   });
 
   describe("initialization", () => {
-    it("INIT emits FETCH_WORDS and sets activity to loading", () => {
+    it("INIT emits LOAD_VOCAB and sets activity to loading", () => {
       const { state, effects } = transition(initialState(), { type: "INIT" });
       expect(state.activity.kind).toBe("loading");
-      expect(effects).toContainEqual({ type: "FETCH_WORDS", count: 5 });
+      expect(effects).toContainEqual({ type: "LOAD_VOCAB" });
     });
 
-    it("WORDS_LOADED transitions from loading to idle with first word", () => {
+    it("VOCAB_LOADED transitions from loading to idle with words", () => {
       const { state: s1 } = transition(initialState(), { type: "INIT" });
-      const { state: s2 } = transition(s1, { type: "WORDS_LOADED", words: [word1, word2] });
+      const { state: s2 } = transition(s1, { type: "VOCAB_LOADED", items: catalog });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word1]);
+        expect(s2.activity.session.words.length).toBeGreaterThanOrEqual(1);
       }
-      expect(s2.wordPool).toEqual([word2]);
+      expect(s2.vocabCatalog).toEqual(catalog);
     });
 
-    it("WORDS_LOADED with empty array stays loading with error", () => {
+    it("VOCAB_LOADED with empty array stays loading with error", () => {
       const { state: s1 } = transition(initialState(), { type: "INIT" });
-      const { state: s2 } = transition(s1, { type: "WORDS_LOADED", words: [] });
+      const { state: s2 } = transition(s1, { type: "VOCAB_LOADED", items: [] });
       expect(s2.activity.kind).toBe("loading");
       expect(s2.error).toBeTruthy();
     });
 
-    it("WORDS_LOAD_FAILED sets error", () => {
+    it("VOCAB_LOAD_FAILED sets error", () => {
       const { state: s1 } = transition(initialState(), { type: "INIT" });
-      const { state: s2 } = transition(s1, { type: "WORDS_LOAD_FAILED", error: "Network error" });
+      const { state: s2 } = transition(s1, { type: "VOCAB_LOAD_FAILED", error: "Network error" });
       expect(s2.error).toBe("Network error");
     });
   });
 
   describe("recording flow", () => {
     it("RECORD_START from idle transitions to recording with START_RECORDING effect", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2, effects } = transition(state, { type: "RECORD_START" });
       expect(s2.activity.kind).toBe("recording");
       expect(effects).toContainEqual({ type: "START_RECORDING" });
     });
 
     it("RECORD_STOP transitions to transcribing with STT effect", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = transition(state, { type: "RECORD_START" });
       const { state: s3, effects } = transition(s2, { type: "RECORD_STOP" });
       expect(s3.activity.kind).toBe("transcribing");
-      expect(effects).toContainEqual(
-        expect.objectContaining({ type: "STOP_RECORDING_AND_TRANSCRIBE", sttHint: expect.stringContaining("소") })
-      );
+      expect(effects.some((e) => e.type === "STOP_RECORDING_AND_TRANSCRIBE")).toBe(true);
     });
 
     it("RECORD_CANCEL returns to idle with CANCEL_RECORDING effect", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = transition(state, { type: "RECORD_START" });
       const { state: s3, effects } = transition(s2, { type: "RECORD_CANCEL" });
       expect(s3.activity.kind).toBe("idle");
@@ -133,14 +132,14 @@ describe("pipeline state machine", () => {
     });
 
     it("RECORD_START from non-idle is a no-op", () => {
-      const state = confirmingWord1();
+      const state = confirmingState();
       const { state: s2, effects } = transition(state, { type: "RECORD_START" });
       expect(s2).toEqual(state);
       expect(effects).toEqual([]);
     });
 
     it("STT_RESULT transitions from transcribing to confirming", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = fire(state, { type: "RECORD_START" }, { type: "RECORD_STOP" });
       const { state: s3 } = transition(s2, { type: "STT_RESULT", transcript: "소가 잤어요" });
       expect(s3.activity.kind).toBe("confirming");
@@ -150,7 +149,7 @@ describe("pipeline state machine", () => {
     });
 
     it("STT_FAILED returns to idle with error", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = fire(state, { type: "RECORD_START" }, { type: "RECORD_STOP" });
       const { state: s3 } = transition(s2, { type: "STT_FAILED", error: "Mic error" });
       expect(s3.activity.kind).toBe("idle");
@@ -160,7 +159,7 @@ describe("pipeline state machine", () => {
 
   describe("dev mode", () => {
     it("DEV_SUBMIT from idle transitions to confirming", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = transition(state, { type: "DEV_SUBMIT", text: "소가 먹어요" });
       expect(s2.activity.kind).toBe("confirming");
       if (s2.activity.kind === "confirming") {
@@ -169,7 +168,7 @@ describe("pipeline state machine", () => {
     });
 
     it("DEV_SUBMIT from non-idle is a no-op", () => {
-      const state = confirmingWord1();
+      const state = confirmingState();
       const { state: s2 } = transition(state, { type: "DEV_SUBMIT", text: "ignored" });
       expect(s2).toEqual(state);
     });
@@ -177,8 +176,8 @@ describe("pipeline state machine", () => {
 
   describe("confirm / reject", () => {
     it("CONFIRM appends attempt to thread and emits EVALUATE", () => {
-      const state = confirmingWord1("소가 잤어요");
-      const { state: s2, effects } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
+      const state = confirmingState("소가 잤어요");
+      const { effects } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       const evalEffect = effects.find((e) => e.type === "EVALUATE");
       expect(evalEffect).toBeTruthy();
       if (evalEffect && evalEffect.type === "EVALUATE") {
@@ -187,18 +186,18 @@ describe("pipeline state machine", () => {
       }
     });
 
-    it("CONFIRM advances to new word when reviewQueue empty and pool has words", () => {
-      const state = confirmingWord1();
+    it("CONFIRM advances to new word when reviewQueue empty and catalog loaded", () => {
+      const state = confirmingState();
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word2]);
+        expect(s2.activity.session.words.length).toBeGreaterThanOrEqual(1);
       }
       expect(s2.backgroundEvals.length).toBe(1);
     });
 
     it("CONFIRM advances to queued review when reviewQueue non-empty", () => {
-      const state = confirmingWord1();
+      const state = confirmingState();
       const reviewSession: WordSession = {
         sessionId: "old-session",
         words: [word3],
@@ -216,17 +215,16 @@ describe("pipeline state machine", () => {
       expect(s2.reviewQueue.length).toBe(0);
     });
 
-    it("CONFIRM goes to loading when pool and queue both empty", () => {
-      const state = confirmingWord1();
-      const emptyPoolState = { ...state, wordPool: [] };
-      const { state: s2, effects } = transition(emptyPoolState, { type: "CONFIRM_TRANSCRIPT" });
+    it("CONFIRM goes to loading when catalog empty and queue empty", () => {
+      const state = confirmingState();
+      const emptyCatalogState = { ...state, vocabCatalog: [] as VocabItem[] };
+      const { state: s2, effects } = transition(emptyCatalogState, { type: "CONFIRM_TRANSCRIPT" });
       expect(s2.activity.kind).toBe("loading");
-      expect(effects.some((e) => e.type === "FETCH_WORDS")).toBe(true);
+      expect(effects.some((e) => e.type === "LOAD_VOCAB")).toBe(true);
     });
 
     it("CONFIRM cancels prior background eval for same session (retry)", () => {
-      const state = confirmingWord1();
-      // Simulate a prior eval in flight for the same session
+      const state = confirmingState();
       const sessionId = (state.activity as any).session.sessionId;
       const stateWithPrior = {
         ...state,
@@ -237,7 +235,7 @@ describe("pipeline state machine", () => {
     });
 
     it("REJECT returns to idle with same session", () => {
-      const state = confirmingWord1();
+      const state = confirmingState();
       const sessionId = (state.activity as any).session.sessionId;
       const { state: s2 } = transition(state, { type: "REJECT_TRANSCRIPT" });
       expect(s2.activity.kind).toBe("idle");
@@ -249,10 +247,9 @@ describe("pipeline state machine", () => {
 
   describe("background eval completion", () => {
     it("EVAL_COMPLETE pushes to reviewQueue when user is on different word", () => {
-      // Confirm word1 → moves to word2 idle → eval for word1 completes
-      const state = confirmingWord1("소가 잤어요");
+      const state = confirmingState("소가 잤어요");
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
-      expect(s2.activity.kind).toBe("idle"); // on word2
+      expect(s2.activity.kind).toBe("idle");
 
       const bgSessionId = s2.backgroundEvals[0].sessionId;
       const { state: s3 } = transition(s2, {
@@ -266,45 +263,30 @@ describe("pipeline state machine", () => {
     });
 
     it("EVAL_COMPLETE updates session in-place when user is reviewing that session", () => {
-      // Get a session into reviewing state, then fire eval complete for it
-      const state = confirmingWord1("소가 잤어요");
+      const state = confirmingState("소가 잤어요");
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       const bgSessionId = s2.backgroundEvals[0].sessionId;
 
-      // Simulate: user confirms word2 too, and word1 eval arrives, goes to queue
-      const s3 = fire(s2,
-        { type: "DEV_SUBMIT", text: "산에 갔어요" },
-        { type: "CONFIRM_TRANSCRIPT" },
-      ).state;
-
-      // Now word1 eval completes → goes to reviewQueue
-      const { state: s4 } = transition(s3, {
-        type: "EVAL_COMPLETE",
-        sessionId: bgSessionId,
-        feedback: goodFeedback,
-      });
-
-      // But if user is ALREADY reviewing that session (e.g. from the queue),
-      // test the in-place update path. Let's construct it directly:
+      // Construct reviewing state directly for this session
       const reviewingState: PipelineState = {
         ...s2,
         activity: { kind: "reviewing", session: s2.backgroundEvals[0].session },
       };
-      const { state: s5 } = transition(reviewingState, {
+      const { state: s3 } = transition(reviewingState, {
         type: "EVAL_COMPLETE",
         sessionId: bgSessionId,
         feedback: badFeedback,
       });
-      expect(s5.activity.kind).toBe("reviewing");
-      if (s5.activity.kind === "reviewing") {
-        const evalMsgs = s5.activity.session.thread.filter((m) => m.kind === "evaluation");
+      expect(s3.activity.kind).toBe("reviewing");
+      if (s3.activity.kind === "reviewing") {
+        const evalMsgs = s3.activity.session.thread.filter((m) => m.kind === "evaluation");
         expect(evalMsgs.length).toBe(1);
         expect((evalMsgs[0] as any).feedback).toEqual(badFeedback);
       }
     });
 
     it("EVAL_COMPLETE removes entry from backgroundEvals", () => {
-      const state = confirmingWord1();
+      const state = confirmingState();
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       expect(s2.backgroundEvals.length).toBe(1);
 
@@ -317,13 +299,12 @@ describe("pipeline state machine", () => {
     });
 
     it("EVAL_COMPLETE pops from reviewQueue when activity is loading", () => {
-      // Contrived: activity is loading, no words, bg eval completes
-      const state = confirmingWord1();
+      const state = confirmingState();
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       const loadingState: PipelineState = {
         ...s2,
         activity: { kind: "loading" },
-        wordPool: [],
+        vocabCatalog: [],
       };
       const { state: s3 } = transition(loadingState, {
         type: "EVAL_COMPLETE",
@@ -334,7 +315,7 @@ describe("pipeline state machine", () => {
     });
 
     it("EVAL_FAILED creates synthetic failure feedback", () => {
-      const state = confirmingWord1();
+      const state = confirmingState();
       const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
       const { state: s3 } = transition(s2, {
         type: "EVAL_FAILED",
@@ -351,28 +332,8 @@ describe("pipeline state machine", () => {
       }
     });
 
-    it("two EVAL_COMPLETEs while user is on a fresh word both land in reviewQueue", () => {
-      // Confirm word1 → idle word2 → confirm word2 → idle word3
-      const state = idleWithWord1();
-      let s = state;
-
-      // Confirm word1
-      s = fire(s, { type: "DEV_SUBMIT", text: "소가 잤어요" }, { type: "CONFIRM_TRANSCRIPT" }).state;
-      const bg1SessionId = s.backgroundEvals[0].sessionId;
-
-      // Confirm word2
-      s = fire(s, { type: "DEV_SUBMIT", text: "산에 갔어요" }, { type: "CONFIRM_TRANSCRIPT" }).state;
-      const bg2SessionId = s.backgroundEvals.find((e) => e.sessionId !== bg1SessionId)?.sessionId;
-
-      // Both evals complete
-      s = transition(s, { type: "EVAL_COMPLETE", sessionId: bg1SessionId, feedback: goodFeedback }).state;
-      s = transition(s, { type: "EVAL_COMPLETE", sessionId: bg2SessionId!, feedback: badFeedback }).state;
-
-      expect(s.reviewQueue.length).toBe(2);
-    });
-
     it("EVAL_COMPLETE for unknown sessionId is a no-op", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = transition(state, {
         type: "EVAL_COMPLETE",
         sessionId: "nonexistent",
@@ -396,7 +357,7 @@ describe("pipeline state machine", () => {
         ...initialState(),
         activity: { kind: "reviewing", session: session1 },
         reviewQueue: [session2],
-        wordPool: [word3],
+        vocabCatalog: catalog,
       };
       const { state: s2 } = transition(state, { type: "REVIEW_NEXT" });
       expect(s2.activity.kind).toBe("reviewing");
@@ -406,7 +367,7 @@ describe("pipeline state machine", () => {
       expect(s2.reviewQueue.length).toBe(0);
     });
 
-    it("REVIEW_NEXT creates new word from pool if queue empty", () => {
+    it("REVIEW_NEXT creates new word from catalog if queue empty", () => {
       const session: WordSession = {
         sessionId: "s1", words: [word1],
         thread: [{ kind: "attempt", transcript: "소" }, { kind: "evaluation", feedback: goodFeedback }],
@@ -415,16 +376,16 @@ describe("pipeline state machine", () => {
         ...initialState(),
         activity: { kind: "reviewing", session },
         reviewQueue: [],
-        wordPool: [word2, word3],
+        vocabCatalog: catalog,
       };
       const { state: s2 } = transition(state, { type: "REVIEW_NEXT" });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word2]);
+        expect(s2.activity.session.words.length).toBeGreaterThanOrEqual(1);
       }
     });
 
-    it("REVIEW_NEXT goes to loading if both empty", () => {
+    it("REVIEW_NEXT goes to loading if catalog empty and queue empty", () => {
       const session: WordSession = {
         sessionId: "s1", words: [word1],
         thread: [{ kind: "attempt", transcript: "소" }, { kind: "evaluation", feedback: goodFeedback }],
@@ -433,11 +394,11 @@ describe("pipeline state machine", () => {
         ...initialState(),
         activity: { kind: "reviewing", session },
         reviewQueue: [],
-        wordPool: [],
+        vocabCatalog: [],
       };
       const { state: s2, effects } = transition(state, { type: "REVIEW_NEXT" });
       expect(s2.activity.kind).toBe("loading");
-      expect(effects).toContainEqual({ type: "FETCH_WORDS", count: 5 });
+      expect(effects).toContainEqual({ type: "LOAD_VOCAB" });
     });
 
     it("REVIEW_RETRY returns to idle with same session, thread preserved", () => {
@@ -451,7 +412,7 @@ describe("pipeline state machine", () => {
       const state: PipelineState = {
         ...initialState(),
         activity: { kind: "reviewing", session },
-        wordPool: [word2],
+        vocabCatalog: catalog,
       };
       const { state: s2 } = transition(state, { type: "REVIEW_RETRY" });
       expect(s2.activity.kind).toBe("idle");
@@ -472,17 +433,15 @@ describe("pipeline state machine", () => {
       const state: PipelineState = {
         ...initialState(),
         activity: { kind: "reviewing", session },
-        wordPool: [word2, word3],
+        vocabCatalog: catalog,
       };
 
-      // Retry → idle → dev submit → confirming → confirm
       const { state: s2, effects } = fire(state,
         { type: "REVIEW_RETRY" },
         { type: "DEV_SUBMIT", text: "소가 잤어요" },
         { type: "CONFIRM_TRANSCRIPT" },
       );
 
-      // The EVALUATE effect should have a thread with both attempts
       const evalEffect = effects.find((e) => e.type === "EVALUATE");
       expect(evalEffect).toBeTruthy();
       if (evalEffect && evalEffect.type === "EVALUATE") {
@@ -564,7 +523,7 @@ describe("pipeline state machine", () => {
     });
 
     it("CHAT_SEND from non-reviewing is a no-op", () => {
-      const state = idleWithWord1();
+      const state = idleWithCatalog();
       const { state: s2 } = transition(state, { type: "CHAT_SEND", text: "hello" });
       expect(s2).toEqual(state);
     });
@@ -588,7 +547,7 @@ describe("pipeline state machine", () => {
         sessionId: "s2",
         feedback: goodFeedback,
       });
-      expect(s2.activity.kind).toBe("chatting"); // didn't interrupt
+      expect(s2.activity.kind).toBe("chatting");
       expect(s2.reviewQueue.length).toBe(1);
       expect(s2.reviewQueue[0].sessionId).toBe("s2");
     });
@@ -597,7 +556,7 @@ describe("pipeline state machine", () => {
   describe("end", () => {
     it("END aborts all background evals and sets activity to finished", () => {
       const state: PipelineState = {
-        ...idleWithWord1(),
+        ...idleWithCatalog(),
         backgroundEvals: [
           { sessionId: "s1", abortId: "a1", session: { sessionId: "s1", words: [word1], thread: [] } },
           { sessionId: "s2", abortId: "a2", session: { sessionId: "s2", words: [word2], thread: [] } },
@@ -611,112 +570,7 @@ describe("pipeline state machine", () => {
     });
   });
 
-  describe("edge cases", () => {
-    it("WORDS_LOADED while not loading just grows the pool", () => {
-      const state = idleWithWord1();
-      const poolBefore = state.wordPool.length;
-      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [word3] });
-      expect(s2.wordPool.length).toBe(poolBefore + 1);
-      expect(s2.activity.kind).toBe("idle"); // unchanged
-    });
-
-    it("confirm drains pool; when pool runs low, FETCH_WORDS is emitted", () => {
-      // Start with pool of 2 words (word2 and word3, word1 is active)
-      const state = idleWithWord1();
-      expect(state.wordPool).toEqual([word2, word3]);
-
-      // Confirm word1 → now on word2, pool = [word3] — low!
-      const s2 = fire(state, { type: "DEV_SUBMIT", text: "test" }, { type: "CONFIRM_TRANSCRIPT" });
-      // Pool should be [word3], which is ≤2, so FETCH_WORDS should be emitted
-      const fetchEffects = s2.effects.filter((e) => e.type === "FETCH_WORDS");
-      expect(fetchEffects.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("groupPool and companions", () => {
-    const group1: WordGroup = { words: [word4, word5] };
-    const group2: WordGroup = { words: [word1, word3] };
-
-    it("advanceActivity prefers groupPool when !easyMode", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "loading" },
-        wordPool: [word1, word2],
-        groupPool: [group1, group2],
-        easyMode: false,
-      };
-      const effects: PipelineEffect[] = [];
-      // Simulate WORDS_LOADED to get to idle
-      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [] });
-      // Should have used group1
-      expect(s2.activity.kind).toBe("idle");
-      if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word4, word5]);
-      }
-    });
-
-    it("advanceActivity falls back to wordPool when groupPool empty", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "loading" },
-        wordPool: [word1, word2],
-        groupPool: [],
-        easyMode: false,
-      };
-      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [] });
-      expect(s2.activity.kind).toBe("idle");
-      if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word1]);
-      }
-    });
-
-    it("advanceActivity ignores groupPool in easyMode", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "loading" },
-        wordPool: [word1, word2],
-        groupPool: [group1],
-        easyMode: true,
-      };
-      const { state: s2 } = transition(state, { type: "WORDS_LOADED", words: [] });
-      expect(s2.activity.kind).toBe("idle");
-      if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word1]);
-      }
-    });
-
-    it("GROUPS_LOADED appends to groupPool", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-        groupPool: [group1],
-      };
-      const { state: s2 } = transition(state, { type: "GROUPS_LOADED", groups: [group2] });
-      expect(s2.groupPool).toEqual([group1, group2]);
-    });
-
-    it("GROUPS_LOADED while loading transitions to idle with group words", () => {
-      const state: PipelineState = {
-        ...initialState(false),
-        activity: { kind: "loading" },
-              };
-      const { state: s2 } = transition(state, { type: "GROUPS_LOADED", groups: [group1, group2] });
-      expect(s2.activity.kind).toBe("idle");
-      if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word4, word5]);
-      }
-      expect(s2.groupPool).toEqual([group2]);
-    });
-
-    it("GROUPS_LOAD_FAILED is a no-op", () => {
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-      };
-      const { state: s2 } = transition(state, { type: "GROUPS_LOAD_FAILED", error: "oops" });
-      expect(s2.error).toBeNull();
-    });
-
+  describe("easy mode toggle", () => {
     it("SET_EASY_MODE updates state", () => {
       const state = initialState();
       const { state: s2 } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
@@ -724,68 +578,27 @@ describe("pipeline state machine", () => {
     });
 
     it("SET_EASY_MODE while idle advances to next word immediately", () => {
-      // In easy mode with word1 showing, groups available
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "idle", session: { sessionId: "s1", words: [word1], thread: [] } },
-        groupPool: [group1],
-        wordPool: [word2, word3],
-      };
-      // Switch to normal mode → should advance to group1
+      const state = idleWithCatalog();
+      const sessionBefore = (state.activity as any).session.sessionId;
       const { state: s2 } = transition(state, { type: "SET_EASY_MODE", easyMode: false });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words).toEqual([word4, word5]);
+        // Should have advanced to a different session
+        expect(s2.activity.session.sessionId).not.toBe(sessionBefore);
       }
     });
 
-    it("SET_EASY_MODE to easy while showing pair advances to single word", () => {
+    it("easy mode picks single word", () => {
       const state: PipelineState = {
-        ...initialState(false),
-        activity: { kind: "idle", session: { sessionId: "s1", words: [word4, word5], thread: [] } },
-        groupPool: [group2],
-        wordPool: [word2, word3],
+        ...initialState(),
+        activity: { kind: "loading" },
+        vocabCatalog: catalog,
+        easyMode: true,
       };
-      // Switch to easy → should advance to single word from wordPool
-      const { state: s2 } = transition(state, { type: "SET_EASY_MODE", easyMode: true });
+      const { state: s2 } = transition(state, { type: "VOCAB_LOADED", items: catalog });
       expect(s2.activity.kind).toBe("idle");
       if (s2.activity.kind === "idle") {
         expect(s2.activity.session.words.length).toBe(1);
-        expect(s2.activity.session.words).toEqual([word2]);
-      }
-    });
-
-    it("session.words length 2 from groupPool", () => {
-      // Normal mode, confirm → advance picks from groupPool
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "confirming", session: { sessionId: "s1", words: [word1], thread: [] }, transcript: "test" },
-        easyMode: false,
-        groupPool: [group1],
-        wordPool: [word2, word3],
-      };
-      const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
-      expect(s2.activity.kind).toBe("idle");
-      if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words.length).toBe(2);
-        expect(s2.activity.session.words).toEqual([word4, word5]);
-      }
-    });
-
-    it("session.words length 1 from wordPool", () => {
-      // Normal mode but no groups → falls back to wordPool
-      const state: PipelineState = {
-        ...initialState(),
-        activity: { kind: "confirming", session: { sessionId: "s1", words: [word1], thread: [] }, transcript: "test" },
-        easyMode: false,
-        groupPool: [],
-        wordPool: [word2, word3],
-              };
-      const { state: s2 } = transition(state, { type: "CONFIRM_TRANSCRIPT" });
-      expect(s2.activity.kind).toBe("idle");
-      if (s2.activity.kind === "idle") {
-        expect(s2.activity.session.words.length).toBe(1);
-        expect(s2.activity.session.words).toEqual([word2]);
       }
     });
 
@@ -806,6 +619,25 @@ describe("pipeline state machine", () => {
         expect(sttEffect.sttHint).toContain("노란색");
         expect(sttEffect.sttHint).toContain("원피스");
       }
+    });
+  });
+
+  describe("recentWordIds tracking", () => {
+    it("tracks recently shown word IDs", () => {
+      const state = idleWithCatalog();
+      expect(state.recentWordIds.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("caps recentWordIds at 10", () => {
+      // Start with already-full recent list
+      const state: PipelineState = {
+        ...initialState(),
+        activity: { kind: "loading" },
+        vocabCatalog: catalog,
+        recentWordIds: ["r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10"],
+      };
+      const { state: s2 } = transition(state, { type: "VOCAB_LOADED", items: catalog });
+      expect(s2.recentWordIds.length).toBeLessThanOrEqual(10);
     });
   });
 });

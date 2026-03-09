@@ -39,18 +39,18 @@ export function createEffectExecutor(dispatch: (e: PipelineEvent) => void) {
 
   return function executeEffect(effect: PipelineEffect) {
     switch (effect.type) {
-      case "FETCH_WORDS": {
-        fetch(`/api/vocab/random?count=${effect.count}`)
+      case "LOAD_VOCAB": {
+        fetch("/api/vocab/all")
           .then((r) => r.json())
           .then((data) => {
             dispatch(
               data.items
-                ? { type: "WORDS_LOADED", words: data.items }
-                : { type: "WORDS_LOAD_FAILED", error: "No vocabulary available" }
+                ? { type: "VOCAB_LOADED", items: data.items }
+                : { type: "VOCAB_LOAD_FAILED", error: "No vocabulary available" }
             );
           })
           .catch(() => {
-            dispatch({ type: "WORDS_LOAD_FAILED", error: "Could not load vocabulary" });
+            dispatch({ type: "VOCAB_LOAD_FAILED", error: "Could not load vocabulary" });
           });
         break;
       }

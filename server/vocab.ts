@@ -75,20 +75,11 @@ export function getVocabItemById(id: string): VocabItem | undefined {
   return vocabItems.find((v) => v.id === id);
 }
 
-function pickRandom(count: number): VocabItem[] {
-  const shuffled = [...vocabItems].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(count, shuffled.length));
-}
-
 export const vocabApp = new Hono();
 
-vocabApp.get("/random", (c) => {
-  if (vocabItems.length === 0) {
-    return c.json({ error: "Vocab data not loaded" }, 503);
-  }
-  const count = parseInt(c.req.query("count") || "3", 10);
-  const items = pickRandom(count);
-  return c.json({ items });
+vocabApp.get("/all", (c) => {
+  if (vocabItems.length === 0) return c.json({ error: "Vocab data not loaded" }, 503);
+  return c.json({ items: vocabItems });
 });
 
 vocabApp.get("/assets/:filename", async (c) => {
