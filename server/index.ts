@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { join } from "path";
 import { writeFileSync } from "fs";
 import { bootClient, sendPrompt, shutdownClient } from "./llm";
-import { transcribe } from "./stt";
+import { bootWhisperServer, shutdownWhisperServer, transcribe } from "./stt";
 import { loadVocab, vocabApp } from "./vocab";
 
 const app = new Hono();
@@ -67,8 +67,9 @@ function parseArgs(): { port: number } {
 
 const { port } = parseArgs();
 
-// Boot LLM client and load vocab data, then start server
+// Boot LLM client, whisper server, and load vocab data, then start server
 await bootClient();
+await bootWhisperServer(port);
 loadVocab();
 
 // ─── Static file serving via Bun.serve ──────────────────────────────
@@ -124,11 +125,13 @@ console.log(`Server running at http://localhost:${server.port}`);
 // Graceful shutdown
 process.on("SIGINT", async () => {
   console.log("\nShutting down...");
+  await shutdownWhisperServer();
   await shutdownClient();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
+  await shutdownWhisperServer();
   await shutdownClient();
   process.exit(0);
 });
