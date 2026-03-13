@@ -129,7 +129,7 @@ export function transition(
       if (state.activity.kind !== "idle" && state.activity.kind !== "reviewing") return { state, effects };
       effects.push({ type: "START_RECORDING" });
       return {
-        state: { ...state, activity: { kind: "recording", session: state.activity.session } },
+        state: { ...state, activity: { kind: "recording", session: state.activity.session }, error: null },
         effects,
       };
     }
@@ -149,7 +149,7 @@ export function transition(
       if (state.activity.kind !== "recording") return { state, effects };
       effects.push({ type: "CANCEL_RECORDING" });
       return {
-        state: { ...state, activity: { kind: "idle", session: state.activity.session } },
+        state: { ...state, activity: { kind: "idle", session: state.activity.session }, error: null },
         effects,
       };
     }
