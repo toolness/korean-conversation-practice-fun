@@ -53,23 +53,26 @@ app.post("/api/transcribe", async (c) => {
 
 // ─── CLI ────────────────────────────────────────────────────────────
 
-function parseArgs(): { port: number } {
+function parseArgs(): { port: number; verbose: boolean } {
   const args = process.argv.slice(2);
   let port = 8000;
+  let verbose = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--port" && args[i + 1]) {
       port = parseInt(args[i + 1], 10);
       i++;
+    } else if (args[i] === "--verbose") {
+      verbose = true;
     }
   }
-  return { port };
+  return { port, verbose };
 }
 
-const { port } = parseArgs();
+const { port, verbose } = parseArgs();
 
 // Boot LLM client, whisper server, and load vocab data, then start server
 await bootClient();
-await bootWhisperServer(port);
+await bootWhisperServer(port, verbose);
 loadVocab();
 
 // ─── Static file serving via Bun.serve ──────────────────────────────

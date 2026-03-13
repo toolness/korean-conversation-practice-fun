@@ -12,9 +12,10 @@ const DEFAULT_PROMPT = "여보세요, 거기 집이지요? 네, 그런데요. �
 let whisperProc: Subprocess | null = null;
 let whisperPort: number = 0;
 
-export async function bootWhisperServer(webServerPort: number): Promise<void> {
+export async function bootWhisperServer(webServerPort: number, verbose = false): Promise<void> {
   whisperPort = webServerPort + 1000;
 
+  const stdio = verbose ? "inherit" as const : "ignore" as const;
   whisperProc = Bun.spawn(
     [
       "whisper-server",
@@ -23,7 +24,7 @@ export async function bootWhisperServer(webServerPort: number): Promise<void> {
       "--port", String(whisperPort),
       "--host", "127.0.0.1",
     ],
-    { stdout: "inherit", stderr: "inherit" }
+    { stdout: stdio, stderr: stdio }
   );
 
   // Poll until the server is ready
