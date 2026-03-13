@@ -42,13 +42,19 @@ Or point to a model elsewhere:
 export WHISPER_MODEL=/path/to/your/ggml-model.bin
 ```
 
-### Anthropic API key
+You can also put this in an `.env` file.
 
-The AI conversation partner uses Claude. You need an API key:
+### Vibe-coded Hangul Fun
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+Set the `VOCAB_DATA_DIR` env var to your [Vibe-coded Hangul Fun](https://github.com/toolness/vibecoded-hangul-fun) checkout, e.g. in your `.env`:
+
 ```
+VOCAB_DATA_DIR=../vibecoded-hangul-fun
+```
+
+### Claude
+
+The AI conversation partner uses Claude. Make sure you have Claude Code installed and `claude` is on your `PATH`.
 
 ## Setup
 
