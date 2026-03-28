@@ -16,6 +16,8 @@ interface Props {
   onEnd: () => void;
   easyMode: boolean;
   onToggleEasy: () => void;
+  wrongDays: number | null;
+  onSetWrongDays: (days: number | null) => void;
 }
 
 function lastEvalCorrect(activity: Activity): boolean {
@@ -59,8 +61,8 @@ function mapKeyUp(e: KeyboardEvent, activity: Activity): PipelineEvent | null {
   return null;
 }
 
-export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy }: Props) {
-  const [state, setState] = useState<PipelineState>(() => initialState(easyMode));
+export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy, wrongDays, onSetWrongDays }: Props) {
+  const [state, setState] = useState<PipelineState>(() => initialState(easyMode, wrongDays));
   const [input, setInput] = useState("");
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -91,6 +93,11 @@ export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy }: Pro
     dispatch({ type: "SET_EASY_MODE", easyMode });
   }, [easyMode, dispatch]);
 
+  // Sync wrongDays prop into state machine
+  useEffect(() => {
+    dispatch({ type: "SET_RECENT_INCORRECT", days: wrongDays });
+  }, [wrongDays, dispatch]);
+
   // Keyboard listeners (non-dev mode only)
   useEffect(() => {
     if (DEV_MODE) return;
@@ -105,11 +112,9 @@ export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy }: Pro
     }
 
     function onKeyUp(e: KeyboardEvent) {
+      if (e.key === " ") e.preventDefault();
       const event = mapKeyUp(e, stateRef.current.activity);
-      if (event) {
-        e.preventDefault();
-        dispatch(event);
-      }
+      if (event) dispatch(event);
     }
 
     window.addEventListener("keydown", onKeyDown);
@@ -135,6 +140,8 @@ export function PictureSpeaking({ briefing, onEnd, easyMode, onToggleEasy }: Pro
       onInputChange={setInput}
       easyMode={easyMode}
       onToggleEasy={onToggleEasy}
+      wrongDays={wrongDays}
+      onSetWrongDays={onSetWrongDays}
     />
   );
 }

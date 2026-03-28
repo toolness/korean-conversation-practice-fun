@@ -5,8 +5,11 @@ import { PictureSpeaking } from "./components/picture-speaking";
 import { getScenario, type Briefing, type Scenario } from "./scenarios/index";
 import { parseHash, navigate } from "./utils/routing";
 
-const EASY_MODE_INIT =
-  typeof window !== "undefined" && new URLSearchParams(location.search).has("easy");
+const INIT_PARAMS =
+  typeof window !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
+const EASY_MODE_INIT = INIT_PARAMS.has("easy");
+const WRONG_DAYS_INIT: number | null =
+  INIT_PARAMS.has("wrong") ? (Number(INIT_PARAMS.get("wrong")) || 7) : null;
 
 export function App() {
   const initial = parseHash(location.hash);
@@ -16,21 +19,26 @@ export function App() {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(!!initial.scenarioId);
   const [easyMode, setEasyMode] = useState(EASY_MODE_INIT);
+  const [wrongDays, setWrongDaysState] = useState<number | null>(WRONG_DAYS_INIT);
+
+  function updateQueryString(updater: (params: URLSearchParams) => void) {
+    const params = new URLSearchParams(location.search);
+    updater(params);
+    const qs = params.toString().replace(/=(?=&|$)/g, "");
+    history.replaceState(null, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
+  }
 
   function toggleEasyMode() {
     setEasyMode((prev) => {
       const next = !prev;
-      const params = new URLSearchParams(location.search);
-      if (next) params.set("easy", "");
-      else params.delete("easy");
-      const qs = params.toString().replace(/=(?=&|$)/g, "");
-      history.replaceState(
-        null,
-        "",
-        location.pathname + (qs ? "?" + qs : "") + location.hash
-      );
+      updateQueryString((p) => next ? p.set("easy", "") : p.delete("easy"));
       return next;
     });
+  }
+
+  function setWrongDays(days: number | null) {
+    setWrongDaysState(days);
+    updateQueryString((p) => days != null ? p.set("wrong", String(days)) : p.delete("wrong"));
   }
 
   function loadScenario(id: string): { scenario: Scenario; briefing: Briefing } {
@@ -98,6 +106,8 @@ export function App() {
           onEnd={handleBack}
           easyMode={easyMode}
           onToggleEasy={toggleEasyMode}
+          wrongDays={wrongDays}
+          onSetWrongDays={setWrongDays}
         />
       );
     }

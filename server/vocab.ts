@@ -15,6 +15,7 @@ interface VocabWord {
   name: string;
   isTranslation: boolean;
   picture: WordPicture | null;
+  lastIncorrect?: string;
 }
 
 export interface VocabItem {
@@ -23,6 +24,7 @@ export interface VocabItem {
   name: string;
   isTranslation: boolean;
   pictureFilename: string;
+  lastIncorrect?: string;
 }
 
 let vocabItems: VocabItem[] = [];
@@ -57,6 +59,7 @@ export function loadVocab(): boolean {
         name: w.name,
         isTranslation: w.isTranslation,
         pictureFilename: w.picture!.filename!,
+        lastIncorrect: w.lastIncorrect,
       }));
 
     console.log(`Loaded ${vocabItems.length} vocab words with pictures`);

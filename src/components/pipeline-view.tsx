@@ -24,6 +24,8 @@ interface Props {
   onInputChange: (value: string) => void;
   easyMode?: boolean;
   onToggleEasy?: () => void;
+  wrongDays?: number | null;
+  onSetWrongDays?: (days: number | null) => void;
 }
 
 function WordPictures({ session }: { session: WordSession }) {
@@ -121,7 +123,7 @@ function StatusHint({ state }: { state: PipelineState }) {
   ) : null;
 }
 
-export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputChange, easyMode, onToggleEasy }: Props) {
+export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputChange, easyMode, onToggleEasy, wrongDays, onSetWrongDays }: Props) {
   const { activity } = state;
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -322,6 +324,30 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
                   onChange={onToggleEasy}
                 />
                 Easy mode
+              </label>
+            )}
+            {easyMode && onSetWrongDays && (
+              <label style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.8rem", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={wrongDays != null}
+                  onChange={() => onSetWrongDays(wrongDays != null ? null : 7)}
+                />
+                Recently wrong
+                {wrongDays != null && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={wrongDays}
+                      onChange={(e) => onSetWrongDays(Number(e.target.value) || 7)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ width: "3rem", fontSize: "0.8rem", textAlign: "center" }}
+                    />
+                    <span>days</span>
+                  </>
+                )}
               </label>
             )}
             <button

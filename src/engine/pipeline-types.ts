@@ -8,6 +8,7 @@ export interface VocabItem {
   name: string;
   isTranslation: boolean;
   pictureFilename: string;
+  lastIncorrect?: string;
 }
 
 export interface Feedback {
@@ -62,6 +63,7 @@ export interface PipelineState {
   vocabCatalog: VocabItem[];
   recentWordIds: string[];
   easyMode: boolean;
+  recentIncorrectDays: number | null;
   nextAbortId: number;
   error: string | null;
 }
@@ -73,6 +75,7 @@ export type PipelineEvent =
   | { type: "VOCAB_LOADED"; items: VocabItem[] }
   | { type: "VOCAB_LOAD_FAILED"; error: string }
   | { type: "SET_EASY_MODE"; easyMode: boolean }
+  | { type: "SET_RECENT_INCORRECT"; days: number | null }
   | { type: "RECORD_START" }
   | { type: "RECORD_STOP" }
   | { type: "RECORD_CANCEL" }

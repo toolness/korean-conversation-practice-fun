@@ -17,7 +17,7 @@ export interface TransitionResult {
   effects: PipelineEffect[];
 }
 
-export function initialState(easyMode = true): PipelineState {
+export function initialState(easyMode = true, recentIncorrectDays: number | null = null): PipelineState {
   return {
     activity: { kind: "loading" },
     reviewQueue: [],
@@ -25,6 +25,7 @@ export function initialState(easyMode = true): PipelineState {
     vocabCatalog: [],
     recentWordIds: [],
     easyMode,
+    recentIncorrectDays,
     nextAbortId: 1,
     error: null,
   };
@@ -50,6 +51,19 @@ function appendRecent(recentWordIds: string[], words: VocabItem[]): string[] {
   return updated.slice(-RECENT_CAP);
 }
 
+function effectiveCatalog(state: PipelineState): VocabItem[] {
+  if (!state.easyMode || state.recentIncorrectDays == null) {
+    return state.vocabCatalog;
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - state.recentIncorrectDays);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const filtered = state.vocabCatalog.filter(
+    (w) => w.lastIncorrect && w.lastIncorrect >= cutoffStr
+  );
+  return filtered.length > 0 ? filtered : state.vocabCatalog;
+}
+
 /** Pick the next activity. Uses pickNext for word selection. */
 function advanceActivity(
   state: PipelineState,
@@ -58,8 +72,9 @@ function advanceActivity(
   if (state.reviewQueue.length > 0) {
     return { activity: { kind: "reviewing", session: state.reviewQueue[0] }, recentWordIds: state.recentWordIds };
   }
-  if (state.vocabCatalog.length > 0) {
-    const words = pickNext(state.vocabCatalog, collocatesData, state.recentWordIds, state.easyMode);
+  const catalog = effectiveCatalog(state);
+  if (catalog.length > 0) {
+    const words = pickNext(catalog, collocatesData, state.recentWordIds, state.easyMode);
     if (words) {
       return {
         activity: { kind: "idle", session: makeSession(words) },
@@ -117,6 +132,16 @@ export function transition(
 
     case "SET_EASY_MODE": {
       let nextState = { ...state, easyMode: event.easyMode };
+      if (nextState.activity.kind === "idle") {
+        const { activity, recentWordIds } = advanceActivity(nextState, effects);
+        nextState = { ...nextState, activity, recentWordIds };
+        nextState = shiftReviewQueue(nextState);
+      }
+      return { state: nextState, effects };
+    }
+
+    case "SET_RECENT_INCORRECT": {
+      let nextState = { ...state, recentIncorrectDays: event.days };
       if (nextState.activity.kind === "idle") {
         const { activity, recentWordIds } = advanceActivity(nextState, effects);
         nextState = { ...nextState, activity, recentWordIds };
