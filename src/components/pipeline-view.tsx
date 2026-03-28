@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect } from "react";
 import Markdown from "react-markdown";
-import type { PipelineState, PipelineEvent, WordSession, ThreadMessage } from "../engine/pipeline-types";
+import { DEFAULT_WRONG_DAYS, type PipelineState, type PipelineEvent, type WordSession, type ThreadMessage } from "../engine/pipeline-types";
 import type { Activity } from "../engine/pipeline-types";
 import { getNotionPageUrl } from "../utils/notion";
 
@@ -331,7 +331,7 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
                 <input
                   type="checkbox"
                   checked={wrongDays != null}
-                  onChange={() => onSetWrongDays(wrongDays != null ? null : 7)}
+                  onChange={() => onSetWrongDays(wrongDays != null ? null : DEFAULT_WRONG_DAYS)}
                 />
                 Recently wrong
                 {wrongDays != null && (
@@ -341,7 +341,7 @@ export function PipelineView({ state, dispatch, devMode, onEnd, input, onInputCh
                       min={1}
                       max={365}
                       value={wrongDays}
-                      onChange={(e) => onSetWrongDays(Number(e.target.value) || 7)}
+                      onChange={(e) => onSetWrongDays(Number(e.target.value) || DEFAULT_WRONG_DAYS)}
                       onClick={(e) => e.stopPropagation()}
                       style={{ width: "3rem", fontSize: "0.8rem", textAlign: "center" }}
                     />

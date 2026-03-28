@@ -1,5 +1,7 @@
 /** Types for the picture-speaking pipeline state machine. */
 
+export const DEFAULT_WRONG_DAYS = 1;
+
 // ─── Vocabulary ─────────────────────────────────────────────────────
 
 export interface VocabItem {

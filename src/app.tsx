@@ -4,12 +4,13 @@ import { Conversation } from "./components/conversation";
 import { PictureSpeaking } from "./components/picture-speaking";
 import { getScenario, type Briefing, type Scenario } from "./scenarios/index";
 import { parseHash, navigate } from "./utils/routing";
+import { DEFAULT_WRONG_DAYS } from "./engine/pipeline-types";
 
 const INIT_PARAMS =
   typeof window !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
 const EASY_MODE_INIT = INIT_PARAMS.has("easy");
 const WRONG_DAYS_INIT: number | null =
-  INIT_PARAMS.has("wrong") ? (Number(INIT_PARAMS.get("wrong")) || 7) : null;
+  INIT_PARAMS.has("wrong") ? (Number(INIT_PARAMS.get("wrong")) || DEFAULT_WRONG_DAYS) : null;
 
 export function App() {
   const initial = parseHash(location.hash);
