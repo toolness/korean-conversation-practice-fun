@@ -44,6 +44,20 @@ export WHISPER_MODEL=/path/to/your/ggml-model.bin
 
 You can also put this in an `.env` file.
 
+#### Reusing an external whisper-server
+
+By default the app spawns its own `whisper-server` subprocess on `port + 1000` and shuts it down on exit. If you'd rather run whisper-server yourself (e.g. to keep the model loaded across app restarts), point the app at it:
+
+```bash
+# Either env var:
+export WHISPER_URL=http://127.0.0.1:9000
+
+# Or CLI flag (wins if both are set):
+bun run start --whisper-url http://127.0.0.1:9000
+```
+
+When set, the app skips spawn and skips the kill on shutdown. `WHISPER_MODEL` is ignored in this mode — the external server has its own model configured.
+
 ### Vibe-coded Hangul Fun
 
 Set the `VOCAB_DATA_DIR` env var to your [Vibe-coded Hangul Fun](https://github.com/toolness/vibecoded-hangul-fun) checkout, e.g. in your `.env`:
