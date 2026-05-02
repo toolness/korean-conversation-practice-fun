@@ -53,13 +53,36 @@ app.post("/api/transcribe", async (c) => {
 
 // ─── CLI ────────────────────────────────────────────────────────────
 
+const USAGE = `\
+Usage: bun run server/index.ts [options]
+
+Options:
+  --port <n>             Web server port (default: 8000). Whisper-server
+                         spawns on port + 1000 unless an external URL is set.
+  --whisper-url <url>    Use a pre-existing whisper-server at <url> instead
+                         of spawning one. Equivalent to WHISPER_URL env var;
+                         the flag wins if both are set.
+  --verbose              Stream whisper-server stdout/stderr to the console.
+  --help, -h             Show this help and exit.
+
+Environment:
+  WHISPER_URL            Same as --whisper-url.
+  WHISPER_MODEL          Path to the whisper model file (default:
+                         whisper-models/ggml-large-v3-turbo.bin). Ignored
+                         when --whisper-url / WHISPER_URL is set.
+  VOCAB_DATA_DIR         Path to a Vibe-coded Hangul Fun checkout for the
+                         picture-speaking vocab data.`;
+
 function parseArgs(): { port: number; verbose: boolean; whisperUrl?: string } {
   const args = process.argv.slice(2);
   let port = 8000;
   let verbose = false;
   let whisperUrl: string | undefined;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--port" && args[i + 1]) {
+    if (args[i] === "--help" || args[i] === "-h") {
+      console.log(USAGE);
+      process.exit(0);
+    } else if (args[i] === "--port" && args[i + 1]) {
       port = parseInt(args[i + 1], 10);
       i++;
     } else if (args[i] === "--verbose") {
@@ -67,6 +90,10 @@ function parseArgs(): { port: number; verbose: boolean; whisperUrl?: string } {
     } else if (args[i] === "--whisper-url" && args[i + 1]) {
       whisperUrl = args[i + 1];
       i++;
+    } else {
+      console.error(`Unknown argument: ${args[i]}\n`);
+      console.error(USAGE);
+      process.exit(2);
     }
   }
   return { port, verbose, whisperUrl };
