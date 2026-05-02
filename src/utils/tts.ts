@@ -1,5 +1,7 @@
 /** Text-to-speech utilities for Korean. */
 
+const TTS_RATE = 0.5;
+
 const VOICE_PRIORITY = [
   /^yuna.*premium/i,
   /^yuna.*enhanced/i,
@@ -11,7 +13,9 @@ const VOICE_PRIORITY = [
 let koreanVoice: SpeechSynthesisVoice | null = null;
 
 function findBestKoreanVoice(): SpeechSynthesisVoice | null {
-  const korean = speechSynthesis.getVoices().filter((v) => v.lang.startsWith("ko"));
+  const korean = speechSynthesis
+    .getVoices()
+    .filter((v) => v.lang.startsWith("ko"));
   for (const regex of VOICE_PRIORITY) {
     for (const v of korean) {
       if (regex.test(v.name)) return v;
@@ -51,6 +55,7 @@ export function speak(text: string, devMode = false): void {
   for (const part of parts) {
     const u = new SpeechSynthesisUtterance(part);
     u.lang = "ko-KR";
+    u.rate = TTS_RATE;
     if (koreanVoice) u.voice = koreanVoice;
     speechSynthesis.speak(u);
   }
