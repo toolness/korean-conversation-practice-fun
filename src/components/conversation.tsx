@@ -331,7 +331,7 @@ export function Conversation({
         : "ptt-idle";
 
   return (
-    <div className="conv-layout">
+    <div className="conv-layout-split">
       <div className="conv-header">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ margin: 0, border: "none", padding: 0, fontSize: "1.1rem" }}>
@@ -430,6 +430,7 @@ export function Conversation({
       <div className="conv-footer">
         {easyMode && expectedText && (
           <div
+            className="say-this-panel"
             style={{
               background: "var(--bg-alt, #f0f4f8)",
               border: "1px solid var(--border, #ddd)",
@@ -440,6 +441,7 @@ export function Conversation({
           >
             <div className="wireframe-label">Say this:</div>
             <div
+              className="say-this-text"
               style={{
                 fontSize: "1.3rem",
                 textAlign: "center",
