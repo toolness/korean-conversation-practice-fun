@@ -20,6 +20,7 @@ function createPictureSpeakingScenario(role: string): Scenario {
     learnerSpeaker() { return "A"; },
     vocabSection() { return ""; },
     formatExamples() { return ""; },
+    promptContext() { return ""; },
 
     briefing(): Briefing {
       return {

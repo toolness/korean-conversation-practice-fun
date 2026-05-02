@@ -3,12 +3,11 @@
 import { STT_CHARITY_ADDENDUM, type Scenario, type ScriptStep } from "../scenarios/index";
 
 export function buildResolvePrompt(scenario: Scenario, script: ScriptStep[]): string {
-  const c = scenario.context;
-
   const stepsDesc = script
     .map((s, i) => `  Step ${i + 1} (Speaker ${s.speaker}): ${s.description}`)
     .join("\n");
 
+  const context = scenario.promptContext();
   const examples = scenario.formatExamples();
   const vocab = scenario.vocabSection();
 
@@ -17,14 +16,7 @@ You produce Korean dialogue sentences. Respond ONLY with a JSON array of strings
 
 You are generating Korean dialogue for a language practice app.
 
-CONTEXT:
-  Caller name: ${c.caller_name || ""}
-  Friend name: ${c.friend_name || ""}
-  Friend available: ${c.available ?? ""}
-  Activity (if unavailable): ${c.activity_progressive || "N/A"}
-
-Speaker A = the caller
-Speaker B = the person answering the phone at the friend's house
+${context}
 
 SCRIPT STEPS (produce one Korean sentence per step):
 ${stepsDesc}

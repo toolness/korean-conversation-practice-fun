@@ -75,6 +75,7 @@ export interface Scenario {
   learnerSpeaker(): string;
   vocabSection(): string;
   formatExamples(): string;
+  promptContext(): string;
   briefing(): Briefing;
 }
 

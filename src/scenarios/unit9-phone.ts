@@ -124,6 +124,19 @@ function createPhoneCallScenario(role: string): Scenario {
       return lines.join("\n");
     },
 
+    promptContext() {
+      const c = this.context;
+      return `\
+CONTEXT:
+  Caller name: ${c.caller_name || ""}
+  Friend name: ${c.friend_name || ""}
+  Friend available: ${c.available ?? ""}
+  Activity (if unavailable): ${c.activity_progressive || "N/A"}
+
+Speaker A = the caller
+Speaker B = the person answering the phone at the friend's house`;
+    },
+
     formatExamples() {
       if (!this.exampleConversations.length) return "";
       const lines = [

@@ -91,3 +91,76 @@ export const UNIT9_PHRASES: [string, string][] = [
   ["안녕히 계세요", "goodbye (to person staying)"],
   ["알겠습니다", "I understand"],
 ];
+
+// Book 2 Unit 2 — Transportation / Directions
+
+export const BOOK2_UNIT2_TRANSPORT: [string, string][] = [
+  ["지하철", "subway"],
+  ["버스", "bus"],
+  ["택시", "taxi"],
+  ["기차", "train"],
+  ["비행기", "airplane"],
+];
+
+export const BOOK2_UNIT2_VERBS: [string, string][] = [
+  ["타다", "to get on / to ride"],
+  ["내리다", "to get off"],
+  ["갈아타다", "to transfer"],
+  ["걷다", "to walk"],
+  ["걸리다", "to take (time)"],
+];
+
+export const BOOK2_UNIT2_OTHERS: [string, string][] = [
+  ["호선", "subway line number"],
+  ["번", "counting unit after a number"],
+  ["분", "minute(s)"],
+  ["쯤", "about / around"],
+  ["어떻게", "how"],
+  ["얼마나", "how long / how much"],
+  ["여기에서", "from here"],
+  ["같이", "together"],
+];
+
+export const BOOK2_UNIT2_PHRASES: [string, string][] = [
+  ["어떻게 가요?", "How do I get there?"],
+  ["얼마나 걸려요?", "How long does it take?"],
+  ["몇 번 버스를 타야 돼요?", "What number bus should I take?"],
+  ["몇 호선을 타야 돼요?", "Which subway line should I take?"],
+  ["걸어서 가요", "go on foot"],
+  ["알겠습니다", "I understand"],
+];
+
+/** Famous Seoul destinations the asker might be trying to reach. */
+export const BOOK2_UNIT2_PLACES: [string, string][] = [
+  ["남대문시장", "Namdaemun Market"],
+  ["인사동", "Insa-dong"],
+  ["명동", "Myeong-dong"],
+  ["코엑스몰", "Coex Mall"],
+  ["롯데월드", "Lotte World"],
+  ["예술의 전당", "Seoul Arts Center"],
+];
+
+/** Stations used as get-off points or transfer hubs. */
+export const BOOK2_UNIT2_STATIONS: [string, string][] = [
+  ["회현역", "Hoehyeon Station"],
+  ["시청역", "City Hall Station"],
+  ["안국역", "Anguk Station"],
+  ["교대역", "Seoul Nat'l Univ. of Education Station"],
+  ["삼성역", "Samseong Station"],
+  ["잠실역", "Jamsil Station"],
+  ["사당역", "Sadang Station"],
+  ["명동역", "Myeongdong Station"],
+];
+
+/** Sino-Korean numerals 1–9, used for bus numbers and subway line numbers. */
+export const SINO_NUMBERS_1_TO_9: [number, string][] = [
+  [1, "일"],
+  [2, "이"],
+  [3, "삼"],
+  [4, "사"],
+  [5, "오"],
+  [6, "육"],
+  [7, "칠"],
+  [8, "팔"],
+  [9, "구"],
+];

@@ -55,6 +55,7 @@ export function ensureScenariosLoaded(): void {
   _loaded = true;
   // Dynamic requires to avoid circular initialization
   require("./unit9-phone");
+  require("./book2-unit2-directions");
   require("./scratchpad");
   require("./picture-speaking");
 }
