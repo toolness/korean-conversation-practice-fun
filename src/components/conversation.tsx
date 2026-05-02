@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Markdown from "react-markdown";
 import type { Briefing, Scenario } from "../scenarios/index";
 import type { AgentEvent } from "../engine/runner";
 import { ScriptRunner } from "../engine/runner";
@@ -406,7 +407,7 @@ export function Conversation({
               <div className="correction-panel">
                 <div className="correction-title">Hint</div>
                 {m.hints.map((h, j) => (
-                  <p key={j}>{h}</p>
+                  <Markdown key={j}>{h}</Markdown>
                 ))}
               </div>
             )}
